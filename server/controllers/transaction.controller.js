@@ -12,7 +12,7 @@ const generateInvoiceNumber = async () => {
 // Create a transaction
 export const createTransaction = async (req, res) => {
     try {
-        const { customerName, customerPhone } = req.body;
+        const { customerName, customerPhone, discount = 0 } = req.body; // Add discount field
 
         // Fetch all items in the cart
         const cartItems = await Cart.find().populate('productId');
@@ -47,16 +47,25 @@ export const createTransaction = async (req, res) => {
             totalAmount += product.sellPrice * cartItem.quantity;
         }
 
+        // Apply discount to the total amount
+        totalAmount -= discount;
+
+        // Ensure the total amount is not negative
+        if (totalAmount < 0) {
+            return res.status(400).json({ message: 'Discount cannot be greater than the total amount' });
+        }
+
         // Generate invoice number
         const invoiceNumber = await generateInvoiceNumber();
 
         // Create the transaction
         const transaction = new Transaction({
-            invoiceNumber, // Ensure this is assigned
+            invoiceNumber,
             customerName,
             customerPhone,
             items,
-            totalAmount
+            totalAmount,
+            discount // Include discount in the transaction
         });
 
         await transaction.save();

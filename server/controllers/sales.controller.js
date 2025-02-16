@@ -1,73 +1,113 @@
 import Sale from '../models/sales.model.js';
 import Product from '../models/productlist.model.js';
 
-// Create a new sale
 export const createSale = async (req, res) => {
     try {
-        const { customerName, customerNumber, products, discount } = req.body;
+        const { transactionNo, products, discount = 0, paymentMethod, customerName, customerNumber } = req.body;
 
-        if (!customerName || !customerNumber || !products || products.length === 0) {
-            return res.status(400).json({ message: 'All fields are required' });
+        // Ensure required fields are provided
+        if (!transactionNo || !products || products.length === 0) {
+            return res.status(400).json({ message: "Transaction number and products are required" });
+        }
+
+        // Check if transactionNo already exists
+        const existingSale = await Sale.findOne({ transactionNo });
+        if (existingSale) {
+            return res.status(400).json({ message: "Transaction number already exists" });
+        }
+
+        // Generate a unique invoice number
+        let invoiceNo;
+        let isUnique = false;
+        while (!isUnique) {
+            invoiceNo = Math.floor(100000 + Math.random() * 900000); // 6-digit random number
+            const existingInvoice = await Sale.findOne({ invoiceNo });
+            if (!existingInvoice) {
+                isUnique = true;
+            }
         }
 
         let totalAmount = 0;
-        const saleProducts = [];
+        let saleProducts = [];
 
-        for (const item of products) {
-            const product = await Product.findById(item.productId);
-            if (!product) return res.status(404).json({ message: `Product not found: ${item.productId}` });
+        // Loop through each product in the order
+        for (let item of products) {
+            const { productId, quantity } = item;
 
-            if (product.totalQuantity < item.quantity) {
-                return res.status(400).json({ message: `Insufficient stock for ${product.description}` });
+            // Find the product
+            const product = await Product.findById(productId);
+            if (!product) {
+                return res.status(404).json({ message: `Product not found: ${productId}` });
             }
 
-            const productTotal = product.sellPrice * item.quantity;
-            totalAmount += productTotal;
+            // Check stock availability
+            if (product.totalQuantity < quantity) {
+                return res.status(400).json({ message: `Not enough stock for product: ${product.barcode}` });
+            }
 
+            // Calculate total price for this product
+            const totalPrice = product.sellPrice * quantity;
+            totalAmount += totalPrice;
+
+            // Reduce stock
+            product.totalQuantity -= quantity;
+            await product.save();
+
+            // Add product details to the sale record
             saleProducts.push({
                 productId: product._id,
-                quantity: item.quantity,
-                price: product.sellPrice
+                quantity,
+                totalPrice
             });
-
-            // Update product stock
-            product.totalQuantity -= item.quantity;
-            await product.save();
         }
 
+        // Apply discount (if any)
         const finalAmount = totalAmount - discount;
 
+        if (finalAmount < 0) {
+            return res.status(400).json({ message: "Discount cannot be greater than total amount" });
+        }
+
+        // Create the sale
         const newSale = new Sale({
-            customerName,
-            customerNumber,
+            transactionNo,
+            invoiceNo,
+            products: saleProducts,
             totalAmount,
             discount,
             finalAmount,
-            products: saleProducts
+            paymentMethod,
+            customerName,
+            customerNumber
         });
 
+        // Save the sale
         await newSale.save();
-        res.status(201).json({ message: 'Sale recorded successfully', sale: newSale });
+
+        return res.status(201).json({
+            message: "Sale completed successfully",
+            sale: newSale
+        });
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return res.status(500).json({ message: error.message });
     }
 };
 
 // Get all sales
 export const getAllSales = async (req, res) => {
     try {
-        const sales = await Sale.find().populate('products.productId', 'description sellPrice');
+        const sales = await Sale.find().populate('products.productId', 'barcode description sellPrice');
         res.status(200).json(sales);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
-// Get a single sale by ID
+// Get a single sale
 export const getSaleById = async (req, res) => {
     try {
-        const sale = await Sale.findById(req.params.id).populate('products.productId', 'description sellPrice');
+        const sale = await Sale.findById(req.params.id).populate('products.productId', 'barcode description sellPrice');
         if (!sale) return res.status(404).json({ message: 'Sale not found' });
 
         res.status(200).json(sale);
@@ -79,19 +119,9 @@ export const getSaleById = async (req, res) => {
 // Delete a sale
 export const deleteSale = async (req, res) => {
     try {
-        const sale = await Sale.findById(req.params.id);
+        const sale = await Sale.findByIdAndDelete(req.params.id);
         if (!sale) return res.status(404).json({ message: 'Sale not found' });
 
-        // Restore product stock
-        for (const item of sale.products) {
-            const product = await Product.findById(item.productId);
-            if (product) {
-                product.totalQuantity += item.quantity;
-                await product.save();
-            }
-        }
-
-        await sale.deleteOne();
         res.status(200).json({ message: 'Sale deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: error.message });

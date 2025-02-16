@@ -22,6 +22,8 @@ import paySupplierRoutes from './routes/addpayments.routes.js';
 import usersRoutes from './routes/users.routes.js';
 import cartRoutes from './routes/cart.routes.js';
 import transactionRoutes from './routes/transaction.routes.js';
+import financeRoutes from "./routes/finance.routes.js";
+import productRoutes from './routes/lowstockreport.routes.js';
 
 
 app.use('/api/users', usersRoutes);
@@ -36,14 +38,18 @@ app.use("/api/expenseCategories", expenseCategoryRoutes);
 app.use("/api/storeSettings", storeSettingsRoutes);
 app.use('/api/return-items', returnItemRoutes);
 app.use('/api/payments', paySupplierRoutes);
+app.use('/api/lowstock', productRoutes);
 
 
 // For selling products
 app.use('/api/cart', cartRoutes);
 app.use('/api/transactions', transactionRoutes);
 
+//for selling
 app.use("/api/sales", salesRoutes)
 
+//finance routes
+ app.use("/api/finance", financeRoutes);
 
 //handle error
 app.use((err,req,res,next)=>{

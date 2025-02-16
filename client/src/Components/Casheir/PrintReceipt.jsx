@@ -18,6 +18,7 @@ const PrintReceipt = () => {
         <div className="text-center mb-4">
           <h1 className="text-2xl font-bold">Your Shop Name</h1>
           <p className="text-sm">123 Main Street, City, Country, ZIP</p>
+          <p className="text-sm">Phone: (123) 456-7890</p>
         </div>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-gray-800">Receipt</h2>
@@ -29,22 +30,18 @@ const PrintReceipt = () => {
           <div className="grid grid-cols-2 gap-2 text-sm">
             <p>Transaction No:</p>
             <p className="text-right">{currentReceipt.transactionNo}</p>
+            <p>Invoice No:</p>
+            <p className="text-right">{currentReceipt.invoiceNo}</p>
             <p>Date:</p>
-            <p className="text-right">{currentReceipt.date}</p>
+            <p className="text-right">{new Date(currentReceipt.createdAt).toLocaleString()}</p>
             <p>Subtotal:</p>
-            <p className="text-right">৳{currentReceipt.subtotal.toFixed(2)}</p>
-            <p>Total Discount:</p>
-            <p className="text-right">৳{currentReceipt.totalDiscount.toFixed(2)}</p>
-            <p>VAT:</p>
-            <p className="text-right">৳{currentReceipt.vat.toFixed(2)}</p>
+            <p className="text-right">৳{currentReceipt.totalAmount?.toFixed(2) ?? "N/A"}</p>
+            <p>Discount:</p>
+            <p className="text-right">৳{currentReceipt.discount?.toFixed(2) ?? "N/A"}</p>
             <p className="font-semibold">Total:</p>
-            <p className="text-right font-semibold">৳{currentReceipt.total.toFixed(2)}</p>
-            <p>Payment Amount:</p>
-            <p className="text-right">৳{currentReceipt.paymentAmount.toFixed(2)}</p>
-            <p>Change:</p>
-            <p className="text-right">৳{currentReceipt.change.toFixed(2)}</p>
-            <p>Payment Type:</p>
-            <p className="text-right">{currentReceipt.paymentType}</p>
+            <p className="text-right font-semibold">৳{currentReceipt.finalAmount?.toFixed(2) ?? "N/A"}</p>
+            <p>Payment Method:</p>
+            <p className="text-right">{currentReceipt.paymentMethod}</p>
           </div>
           <table className="w-full text-sm">
             <thead className="border-t border-b">
@@ -56,12 +53,12 @@ const PrintReceipt = () => {
               </tr>
             </thead>
             <tbody>
-              {currentReceipt.items.map((item) => (
-                <tr key={item.id}>
-                  <td className="py-1">{item.description}</td>
-                  <td className="text-right py-1">{item.qty}</td>
-                  <td className="text-right py-1">৳{item.sellPrice.toFixed(2)}</td>
-                  <td className="text-right py-1">৳{item.total.toFixed(2)}</td>
+              {currentReceipt.products?.map((item) => (
+                <tr key={item.productId._id}>
+                  <td className="py-1">{item.productId.description}</td>
+                  <td className="text-right py-1">{item.quantity}</td>
+                  <td className="text-right py-1">৳{item.productId.sellPrice?.toFixed(2) ?? "N/A"}</td>
+                  <td className="text-right py-1">৳{item.totalPrice?.toFixed(2) ?? "N/A"}</td>
                 </tr>
               ))}
             </tbody>
@@ -78,6 +75,8 @@ const PrintReceipt = () => {
         <div className="text-center mt-4 pt-4 border-t">
           <p className="text-sm font-semibold">Thank you for shopping with us!</p>
           <p className="text-xs">We appreciate your business.</p>
+          <p className="text-xs mt-2">Customer: {currentReceipt.customerName}</p>
+          <p className="text-xs">Phone: {currentReceipt.customerNumber}</p>
         </div>
       </div>
     </div>
@@ -85,4 +84,3 @@ const PrintReceipt = () => {
 }
 
 export default PrintReceipt
-

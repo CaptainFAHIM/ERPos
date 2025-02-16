@@ -18,30 +18,7 @@ const POSContent = () => {
     isLoading,
     error,
     showSuccessMessage,
-    showPaymentModal,
     showPrintReceipt,
-    setActiveTab,
-    cart,
-    updateCartItemQuantity,
-    updateCartItemDiscount,
-    removeCartItem,
-    globalDiscount,
-    updateGlobalDiscount,
-    calculateSubtotal,
-    calculateTotalDiscount,
-    calculateTotal,
-    products,
-    handleBarcodeSubmit,
-    transactionNo,
-    time,
-    searchTerm,
-    setSearchTerm,
-    cashierName,
-    addToCart,
-    setShowPaymentModal,
-    currentReceipt,
-    setShowPrintReceipt,
-    settlePayment,
   } = usePOSContext()
 
   const renderContent = () => {
@@ -59,31 +36,7 @@ const POSContent = () => {
       case "Search Product":
         return <SearchProduct />
       case "Settle Payment":
-        return (
-          <div className="p-6 bg-white shadow-lg rounded-lg">
-            <h2 className="text-2xl font-bold mb-6 text-gray-800">Settle Payment</h2>
-            <div className="mb-6 p-4 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg text-white">
-              <p className="text-xl font-semibold">Total Amount</p>
-              <p className="text-4xl font-bold">৳{calculateTotal().toFixed(2)}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-gray-100 p-4 rounded-lg">
-                <p className="text-lg font-semibold text-gray-700">Subtotal</p>
-                <p className="text-2xl font-bold text-gray-900">৳{calculateSubtotal().toFixed(2)}</p>
-              </div>
-              <div className="bg-gray-100 p-4 rounded-lg">
-                <p className="text-lg font-semibold text-gray-700">Discount</p>
-                <p className="text-2xl font-bold text-red-600">৳{calculateTotalDiscount().toFixed(2)}</p>
-              </div>
-            </div>
-            <button
-              className="w-full bg-green-500 text-white p-4 rounded-md hover:bg-green-600 transition duration-200 ease-in-out text-lg font-semibold"
-              onClick={() => setShowPaymentModal(true)}
-            >
-              Proceed to Payment
-            </button>
-          </div>
-        )
+        return <NewTransaction />
       case "Clear Cart":
         return <ClearCart />
       case "Daily Sales":
@@ -115,8 +68,6 @@ const POSContent = () => {
 
         <TransactionDetails />
       </div>
-
-      {showPaymentModal && <PaymentModal />}
 
       {showPrintReceipt && <PrintReceipt />}
 

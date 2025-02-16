@@ -1,10 +1,23 @@
 import { Table } from "flowbite-react";
+import { useEffect, useState } from "react";
 
 export default function CustomerLedgerContent() {
-  const transactions = [
-    { date: "2025-02-01", customer: "John Doe", amount: "$150", status: "Paid" },
-    { date: "2025-02-02", customer: "Alice Smith", amount: "$200", status: "Due" },
-  ];
+  const [transactions, setTransactions] = useState([]);
+
+  useEffect(() => {
+    fetch("http://localhost:4000/api/sales/")
+      .then(response => response.json())
+      .then(data => {
+        const formattedTransactions = data.map(sale => ({
+          date: sale.createdAt ? new Date(sale.createdAt).toLocaleDateString() : "N/A",
+          customer: sale.customerName || "Unknown",
+          amount: `Tk ${sale.finalAmount ? sale.finalAmount.toLocaleString() : "0"}`,
+          status: "Paid"
+        }));
+        setTransactions(formattedTransactions);
+      })
+      .catch(error => console.error("Error fetching sales data:", error));
+  }, []);
 
   return (
     <div className="overflow-auto p-5">

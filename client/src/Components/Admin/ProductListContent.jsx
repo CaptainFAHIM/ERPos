@@ -86,7 +86,7 @@ export default function ProductListContent() {
 
   const validateProduct = () => {
     for (const [key, value] of Object.entries(newProduct)) {
-      if (!value) {
+      if (!value && key !== "__v") {
         setError(`Please fill in the ${key} field.`)
         return false
       }
@@ -115,7 +115,8 @@ export default function ProductListContent() {
 
     try {
       if (editingProduct) {
-        await axios.put(`http://localhost:4000/api/productlist/${editingProduct._id}`, newProduct)
+        const updatedProduct = { ...newProduct, __v: editingProduct.__v }
+        await axios.put(`http://localhost:4000/api/productlist/${editingProduct._id}`, updatedProduct)
       } else {
         await axios.post("http://localhost:4000/api/productlist", newProduct)
       }
@@ -143,7 +144,12 @@ export default function ProductListContent() {
 
   const handleEdit = (product) => {
     setEditingProduct(product)
-    setNewProduct(product)
+    setNewProduct({
+      ...product,
+      purchasePrice: product.purchasePrice.toString(),
+      sellPrice: product.sellPrice.toString(),
+      totalQuantity: product.totalQuantity.toString(),
+    })
     setShowModal(true)
     setBarcodeGenerated(false)
     setBarcodeImageUrl("")

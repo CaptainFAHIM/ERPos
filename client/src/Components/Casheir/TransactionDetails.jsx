@@ -5,7 +5,8 @@ import { FaGripLines } from "react-icons/fa"
 import { usePOSContext } from "./context/POSContext"
 
 const TransactionDetails = () => {
-  const { transactionNo, time, handleBarcodeSubmit, calculateTotal, calculateTotalDiscount } = usePOSContext()
+  const { transactionNo, time, handleBarcodeSubmit, calculateTotal, discount, errorMessage, setErrorMessage } =
+    usePOSContext()
 
   const [barcode, setBarcode] = useState("")
   const [error, setError] = useState("")
@@ -104,10 +105,8 @@ const TransactionDetails = () => {
           <span className="font-semibold">৳{calculateTotal().toFixed(2)}</span>
         </p>
         <p className="flex justify-between">
-          <span className="text-gray-600">Total Discount:</span>
-          <span className="font-semibold">
-            {calculateTotalDiscount() > 0 ? `৳${calculateTotalDiscount().toFixed(2)}` : "-"}
-          </span>
+          <span className="text-gray-600">Discount:</span>
+          <span className="font-semibold">{discount > 0 ? `৳${discount.toFixed(2)}` : "-"}</span>
         </p>
         <p className="flex justify-between">
           <span className="text-gray-600">VAT:</span>
@@ -115,12 +114,15 @@ const TransactionDetails = () => {
         </p>
         <p className="flex justify-between">
           <span className="text-gray-600">Net Total:</span>
-          <span className="font-semibold">৳{(calculateTotal() - calculateTotalDiscount()).toFixed(2)}</span>
+          <span className="font-semibold">৳{(calculateTotal() - discount).toFixed(2)}</span>
         </p>
       </div>
       <div className="mt-6 bg-indigo-600 text-white text-center p-2 text-xl font-bold rounded-md">
         {time.toLocaleTimeString()}
       </div>
+      {errorMessage && (
+        <div className="mt-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded">{errorMessage}</div>
+      )}
     </div>
   )
 }

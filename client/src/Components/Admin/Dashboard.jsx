@@ -152,24 +152,27 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex h-screen relative">
+    <div className="flex h-screen w-full">
       {isMobile && (
         <button className="fixed top-4 left-4 z-50 p-2 bg-green-700 text-white rounded-md" onClick={toggleSidebar}>
           <FaBars />
         </button>
       )}
-      <Sidebar
-        setActiveSection={setActiveSection}
-        setActiveSubcategory={setActiveSubcategory}
-        sections={sections}
-        activeSection={activeSection}
-        activeSubcategory={activeSubcategory}
-        isMobile={isMobile}
-        isOpen={isSidebarOpen}
-        toggleSidebar={toggleSidebar}
-      />
-      <main className={`flex-1 p-5 bg-gray-100 ${isMobile ? "w-full" : ""}`}>{renderContent()}</main>
+      <div className={`h-screen ${isMobile ? "absolute z-50 w-64 bg-white shadow-lg" : "w-64"} transition-all duration-300`}>
+        <Sidebar
+          setActiveSection={setActiveSection}
+          setActiveSubcategory={setActiveSubcategory}
+          sections={sections}
+          activeSection={activeSection}
+          activeSubcategory={activeSubcategory}
+          isMobile={isMobile}
+          isOpen={isSidebarOpen}
+          toggleSidebar={toggleSidebar}
+        />
+      </div>
+      <main className="flex-1 h-screen overflow-auto p-5 bg-gray-100">{renderContent()}</main>
     </div>
   )
 }
+
 

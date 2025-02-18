@@ -127,3 +127,68 @@ export const deleteSale = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+export const returnSale = async (req, res) => {
+    try {
+        const { transactionNo, productId, returnQuantity } = req.body;
+
+        // Ensure required fields are provided
+        if (!transactionNo || !productId || returnQuantity <= 0) {
+            return res.status(400).json({ message: "Transaction number, product ID, and valid return quantity are required" });
+        }
+
+        // Find the sale record
+        const sale = await Sale.findOne({ transactionNo });
+        if (!sale) {
+            return res.status(404).json({ message: "Sale not found" });
+        }
+
+        // Find the product in the sale
+        const saleProduct = sale.products.find(p => p.productId.toString() === productId);
+        if (!saleProduct) {
+            return res.status(404).json({ message: "Product not found in this sale" });
+        }
+
+        // Check if return quantity is valid
+        if (returnQuantity > saleProduct.quantity) {
+            return res.status(400).json({ message: "Return quantity exceeds purchased quantity" });
+        }
+
+        // Find the product in the database
+        const product = await Product.findById(productId);
+        if (!product) {
+            return res.status(404).json({ message: "Product not found in inventory" });
+        }
+
+        // Increase the stock quantity
+        product.totalQuantity += returnQuantity;
+        await product.save();
+
+        // Calculate refund amount
+        const refundAmount = returnQuantity * product.sellPrice;
+
+        // Update sale record
+        saleProduct.quantity -= returnQuantity;
+        saleProduct.totalPrice -= refundAmount;
+        sale.finalAmount -= refundAmount;
+        sale.totalAmount -= refundAmount;
+
+        // Remove product from sale if all items are returned
+        if (saleProduct.quantity === 0) {
+            sale.products = sale.products.filter(p => p.productId.toString() !== productId);
+        }
+
+        // Save updated sale
+        await sale.save();
+
+        return res.status(200).json({
+            message: "Product return processed successfully",
+            refundedAmount: refundAmount,
+            updatedSale: sale
+        });
+
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+};
+

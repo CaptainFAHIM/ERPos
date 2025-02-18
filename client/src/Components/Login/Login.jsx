@@ -2,17 +2,20 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { FaUser, FaLock, FaBook } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import axios from "axios";
+import { signInStart, signInSuccess, signInError } from "../../Redux/UserSlice/UserSlice";
 
 const LoginForm = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(null);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { loading, error } = useSelector((state) => state.user); // Access Redux state
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null); // Reset error message
+    dispatch(signInStart()); // Start loading
 
     try {
       const response = await axios.post("http://localhost:4000/api/users/login", {
@@ -21,20 +24,27 @@ const LoginForm = () => {
       });
 
       if (response.status === 200 && response.data?.user?.role) {
-        const { role } = response.data.user; // Extract role correctly
+        const user = response.data.user; // Extract user data
 
-        if (role === "admin") {
+        // Save user in Redux store
+        dispatch(signInSuccess(user));
+
+        // Save user data in localStorage for persistence
+        localStorage.setItem("user", JSON.stringify(user));
+
+        // Redirect based on user role
+        if (user.role === "admin") {
           navigate("/admin");
-        } else if (role === "cashier") {
+        } else if (user.role === "cashier") {
           navigate("/cashier");
         } else {
-          setError("Invalid role received from server.");
+          dispatch(signInError("Invalid role received from server."));
         }
       } else {
-        setError("Unexpected response from server.");
+        dispatch(signInError("Unexpected response from server."));
       }
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed. Please try again.");
+      dispatch(signInError(err.response?.data?.message || "Login failed. Please try again."));
     }
   };
 
@@ -110,9 +120,12 @@ const LoginForm = () => {
             type="submit"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="w-full py-2 px-4 bg-gradient-to-r from-green-500 to-green-700 text-white font-semibold rounded-lg shadow-md hover:from-green-600 hover:to-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75"
+            disabled={loading}
+            className={`w-full py-2 px-4 font-semibold rounded-lg shadow-md 
+              ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-gradient-to-r from-green-500 to-green-700 text-white hover:from-green-600 hover:to-green-800"}
+            `}
           >
-            Log In
+            {loading ? "Logging in..." : "Log In"}
           </motion.button>
         </form>
       </motion.div>

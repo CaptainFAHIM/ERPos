@@ -1,16 +1,18 @@
-"use client"
-
-import { usePOSContext, POSProvider } from "./context/POSContext"
-import Sidebar from "./Sidebar"
-import PaymentModal from "./PaymentModal"
-import PrintReceipt from "./PrintReceipt"
-import TransactionDetails from "./TransactionDetails"
-import NewTransaction from "./NewTransaction"
-import SearchProduct from "./SearchProduct"
-import DailySales from "./DailySales"
-import ClearCart from "./ClearCart"
-import ChangePassword from "./ChangePassword"
-import UpdatesPanel from "../UpdatesPanel/UpdatesPanel"
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
+import { usePOSContext, POSProvider } from "./context/POSContext";
+import Sidebar from "./Sidebar";
+import PaymentModal from "./PaymentModal";
+import PrintReceipt from "./PrintReceipt";
+import TransactionDetails from "./TransactionDetails";
+import NewTransaction from "./NewTransaction";
+import SearchProduct from "./SearchProduct";
+import DailySales from "./DailySales";
+import ClearCart from "./ClearCart";
+import ChangePassword from "./ChangePassword";
+import UpdatesPanel from "../UpdatesPanel/UpdatesPanel";
+import { signOut } from "../../Redux/UserSlice/UserSlice"; // Import logout action
 
 const POSContent = () => {
   const {
@@ -19,38 +21,38 @@ const POSContent = () => {
     error,
     showSuccessMessage,
     showPrintReceipt,
-  } = usePOSContext()
+  } = usePOSContext();
 
   const renderContent = () => {
     if (isLoading) {
-      return <div className="flex justify-center items-center h-full">Loading...</div>
+      return <div className="flex justify-center items-center h-full">Loading...</div>;
     }
 
     if (error) {
-      return <div className="flex justify-center items-center h-full text-red-500">Error: {error}</div>
+      return <div className="flex justify-center items-center h-full text-red-500">Error: {error}</div>;
     }
 
     switch (activeTab) {
       case "New Transaction":
-        return <NewTransaction />
+        return <NewTransaction />;
       case "Search Product":
-        return <SearchProduct />
+        return <SearchProduct />;
       case "Settle Payment":
-        return <NewTransaction />
+        return <NewTransaction />;
       case "Clear Cart":
-        return <ClearCart />
+        return <ClearCart />;
       case "Daily Sales":
-        return <DailySales />
+        return <DailySales />;
       case "Change Password":
-        return <ChangePassword />
+        return <ChangePassword />;
       default:
-        return null
+        return null;
     }
-  }
+  };
 
   return (
     <div className="flex h-screen bg-gray-100">
-      <Sidebar />
+      <Sidebar /> {/* Sidebar now shows username & role */}
 
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 overflow-y-auto p-4">
@@ -73,16 +75,26 @@ const POSContent = () => {
 
       <UpdatesPanel />
     </div>
-  )
-}
+  );
+};
 
 const POSDashboard = () => {
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const user = useSelector((state) => state.user.currentUser);
+
+  useEffect(() => {
+    if (!user || user.role !== "cashier") {
+      dispatch(signOut()); // Clear user state if unauthorized
+      navigate("/login"); // Redirect to login if not a cashier
+    }
+  }, [user, navigate, dispatch]);
+
   return (
     <POSProvider>
       <POSContent />
     </POSProvider>
-  )
-}
+  );
+};
 
-export default POSDashboard
-
+export default POSDashboard;

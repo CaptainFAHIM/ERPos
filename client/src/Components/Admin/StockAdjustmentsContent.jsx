@@ -1,5 +1,7 @@
+"use client"
+
 import { useState, useEffect } from "react"
-import { Button, TextInput, Table, Modal } from "flowbite-react"
+import { Button, TextInput, Table, Modal, Toast } from "flowbite-react"
 import { FaUser, FaSearch, FaEdit, FaTrash } from "react-icons/fa"
 import axios from "axios"
 
@@ -13,7 +15,6 @@ export default function StockAdjustmentsContent() {
     address: "",
     productName: "",
     barcode: "",
-    quantity: "",
   })
 
   const [stockInEntries, setStockInEntries] = useState([])
@@ -22,6 +23,8 @@ export default function StockAdjustmentsContent() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteId, setDeleteId] = useState(null)
   const [searchTerm, setSearchTerm] = useState("")
+  const [showToast, setShowToast] = useState(false)
+  const [toastMessage, setToastMessage] = useState("")
 
   useEffect(() => {
     fetchStockInEntries()
@@ -33,6 +36,7 @@ export default function StockAdjustmentsContent() {
       setStockInEntries(response.data)
     } catch (error) {
       console.error("Error fetching stock-in entries:", error)
+      showToastMessage("Error fetching stock-in entries")
     }
   }
 
@@ -61,10 +65,11 @@ export default function StockAdjustmentsContent() {
         address: "",
         productName: "",
         barcode: "",
-        quantity: "",
       })
+      showToastMessage("Stock-in entry updated successfully")
     } catch (error) {
       console.error("Error updating stock-in entry:", error)
+      showToastMessage("Error updating stock-in entry")
     }
   }
 
@@ -79,9 +84,17 @@ export default function StockAdjustmentsContent() {
       fetchStockInEntries()
       setShowDeleteModal(false)
       setDeleteId(null)
+      showToastMessage("Stock-in entry deleted successfully")
     } catch (error) {
       console.error("Error deleting stock-in entry:", error)
+      showToastMessage("Error deleting stock-in entry")
     }
+  }
+
+  const showToastMessage = (message) => {
+    setToastMessage(message)
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 3000)
   }
 
   const filteredEntries = stockInEntries.filter(
@@ -181,10 +194,6 @@ export default function StockAdjustmentsContent() {
                   <label>Barcode:</label>
                   <TextInput name="barcode" value={adjustment.barcode} onChange={handleInputChange} />
                 </div>
-                <div className="space-y-2">
-                  <label>Quantity:</label>
-                  <TextInput name="quantity" type="number" value={adjustment.quantity} onChange={handleInputChange} />
-                </div>
               </div>
 
               {/* Other Details */}
@@ -240,7 +249,15 @@ export default function StockAdjustmentsContent() {
             </div>
           </Modal.Body>
         </Modal>
+
+        {/* Toast */}
+        {showToast && (
+          <Toast className="fixed bottom-5 right-5">
+            <div className="text-sm font-normal">{toastMessage}</div>
+          </Toast>
+        )}
       </div>
     </div>
   )
 }
+

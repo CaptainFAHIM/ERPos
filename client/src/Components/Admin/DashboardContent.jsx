@@ -1,160 +1,238 @@
-import { Card } from "flowbite-react"
-import {
-  FaShoppingCart,
-  FaBoxOpen,
-  FaWarehouse,
-  FaExclamationTriangle,
-  FaChartLine,
-  FaMoneyBillWave,
-} from "react-icons/fa"
+"use client"
+
+import { useState, useEffect } from "react"
+import { FaChartLine, FaChartPie, FaChartBar } from "react-icons/fa"
 import {
   AreaChart,
   Area,
+  BarChart,
+  Bar,
   PieChart,
   Pie,
+  Cell,
+  ResponsiveContainer,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer,
 } from "recharts"
+import { motion } from "framer-motion"
 
-export default function DashboardContent() {
-  const salesData = [
-    { month: "Jan", sales: 4000, profit: 2400 },
-    { month: "Feb", sales: 3000, profit: 1398 },
-    { month: "Mar", sales: 2000, profit: 9800 },
-    { month: "Apr", sales: 2780, profit: 3908 },
-    { month: "May", sales: 1890, profit: 4800 },
-    { month: "Jun", sales: 2390, profit: 3800 },
-  ]
+import FinancialSummary from "./financial-summary"
+import SummaryCards from "./summary-cards"
 
-  const categoryData = [
-    { name: "Electronics", value: 400 },
-    { name: "Clothing", value: 300 },
-    { name: "Food", value: 300 },
-    { name: "Books", value: 200 },
-  ]
+const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"]
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-lg">
+        <p className="font-bold text-gray-800">{label}</p>
+        {payload.map((entry, index) => (
+          <p key={index} className="text-sm" style={{ color: entry.color }}>
+            {`${entry.name}: ${entry.value.toLocaleString()}`}
+          </p>
+        ))}
+      </div>
+    )
+  }
+  return null
+}
+
+export default function PremiumDashboard() {
+  const [salesProfitData, setSalesProfitData] = useState(null)
+  const [categoryData, setCategoryData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [selectedPeriod, setSelectedPeriod] = useState("currentMonth")
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        const [salesProfitResponse, categoriesResponse] = await Promise.all([
+          fetch("http://localhost:4000/api/sales-profit"),
+          fetch("http://localhost:4000/api/categories"),
+        ])
+
+        if (!salesProfitResponse.ok || !categoriesResponse.ok) {
+          throw new Error("Failed to fetch data")
+        }
+
+        const salesProfitData = await salesProfitResponse.json()
+        const categories = await categoriesResponse.json()
+
+        setSalesProfitData(salesProfitData)
+
+        const categoryWithProductCounts = await Promise.all(
+          categories.map(async (category) => {
+            const categoryResponse = await fetch(`http://localhost:4000/api/productscategory/${category.categoryName}`)
+            if (!categoryResponse.ok) throw new Error("Failed to fetch product count for category")
+            const productData = await categoryResponse.json()
+            return {
+              name: category.categoryName,
+              value: productData.productCount,
+            }
+          }),
+        )
+
+        setCategoryData(categoryWithProductCounts)
+      } catch (error) {
+        console.error("Error fetching data:", error)
+        setError("Failed to fetch data. Please try again later.")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  const formatChartData = (data, period) => {
+    if (!data || !data[period]) return []
+    return [
+      {
+        name: period,
+        sales: data[period].totalSales,
+        profit: data[period].totalProfit,
+      },
+    ]
+  }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-center mb-5">DASHBOARD</h1>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <motion.h1
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="text-4xl font-bold text-gray-800 mb-8"
+      >
+        Premium Dashboard
+      </motion.h1>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-green-600 text-white">
-          <div className="flex justify-between items-center">
-            <div>
-              <FaShoppingCart size={40} />
-              <h2 className="text-lg">Daily Sales</h2>
-              <p className="text-sm">Total daily sales recorded</p>
-            </div>
-            <span className="text-2xl font-bold">$1,234.00</span>
-          </div>
-        </Card>
+      <SummaryCards setError={setError} />
 
-        <Card className="bg-yellow-500 text-white">
-          <div className="flex justify-between items-center">
-            <div>
-              <FaBoxOpen size={40} />
-              <h2 className="text-lg">Total Products</h2>
-              <p className="text-sm">Products in inventory</p>
+      <div className="mt-8 flex flex-col lg:flex-row gap-8">
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="bg-white rounded-lg shadow-md p-6 flex-1"
+        >
+          <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+            <FaChartLine className="mr-2 text-blue-500" /> Sales & Profit Trends
+          </h2>
+          <select
+            className="mb-4 p-2 border border-gray-300 rounded-md bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={selectedPeriod}
+            onChange={(e) => setSelectedPeriod(e.target.value)}
+          >
+            <option value="currentMonth">Current Month</option>
+            <option value="last3Months">Last 3 Months</option>
+            <option value="last6Months">Last 6 Months</option>
+            <option value="last1Year">Last Year</option>
+            <option value="last3Years">Last 3 Years</option>
+            <option value="allTime">All Time</option>
+          </select>
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             </div>
-            <span className="text-2xl font-bold">324</span>
-          </div>
-        </Card>
+          ) : error ? (
+            <div className="text-red-500 flex items-center justify-center h-64">{error}</div>
+          ) : (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={formatChartData(salesProfitData, selectedPeriod)}>
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Area type="monotone" dataKey="sales" stroke="#3B82F6" fill="#93C5FD" />
+                  <Area type="monotone" dataKey="profit" stroke="#10B981" fill="#6EE7B7" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </motion.div>
 
-        <Card className="bg-teal-600 text-white">
-          <div className="flex justify-between items-center">
-            <div>
-              <FaWarehouse size={40} />
-              <h2 className="text-lg">Stock Value</h2>
-              <p className="text-sm">Total inventory value</p>
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="bg-white rounded-lg shadow-md p-6 flex-1"
+        >
+          <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+            <FaChartPie className="mr-2 text-green-500" /> Category Distribution
+          </h2>
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
             </div>
-            <span className="text-2xl font-bold">$45,678</span>
-          </div>
-        </Card>
-
-        <Card className="bg-red-600 text-white">
-          <div className="flex justify-between items-center">
-            <div>
-              <FaExclamationTriangle size={40} />
-              <h2 className="text-lg">Low Stock</h2>
-              <p className="text-sm">Items needing restock</p>
+          ) : error ? (
+            <div className="text-red-500 flex items-center justify-center h-64">{error}</div>
+          ) : (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={categoryData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {categoryData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
-            <span className="text-2xl font-bold">12</span>
-          </div>
-        </Card>
+          )}
+        </motion.div>
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <h5 className="text-xl font-bold mb-4">Sales & Profit Trends</h5>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={salesData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Area type="monotone" dataKey="sales" stroke="#0891b2" fill="#0891b2" fillOpacity={0.3} />
-              <Area type="monotone" dataKey="profit" stroke="#059669" fill="#059669" fillOpacity={0.3} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card>
-          <h5 className="text-xl font-bold mb-4">Category Distribution</h5>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={categoryData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                fill="#0891b2"
-                label
-              />
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </Card>
-      </div>
-
-      {/* Financial Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h5 className="text-xl font-bold">Monthly Revenue</h5>
-            <FaChartLine className="text-green-600" size={24} />
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.6 }}
+        className="mt-8 bg-white rounded-lg shadow-md p-6"
+      >
+        <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+          <FaChartBar className="mr-2 text-purple-500" /> Category Comparison
+        </h2>
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
           </div>
-          <p className="text-3xl font-bold text-green-600">$24,567</p>
-          <p className="text-sm text-gray-600">+12.5% from last month</p>
-        </Card>
-
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h5 className="text-xl font-bold">Expenses</h5>
-            <FaMoneyBillWave className="text-red-600" size={24} />
+        ) : error ? (
+          <div className="text-red-500 flex items-center justify-center h-64">{error}</div>
+        ) : (
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={categoryData}>
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
+                <Bar dataKey="value">
+                  {categoryData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-          <p className="text-3xl font-bold text-red-600">$12,345</p>
-          <p className="text-sm text-gray-600">-3.2% from last month</p>
-        </Card>
+        )}
+      </motion.div>
 
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h5 className="text-xl font-bold">Net Profit</h5>
-            <FaChartLine className="text-blue-600" size={24} />
-          </div>
-          <p className="text-3xl font-bold text-blue-600">$12,222</p>
-          <p className="text-sm text-gray-600">+15.8% from last month</p>
-        </Card>
-      </div>
+      <FinancialSummary setError={setError} />
     </div>
   )
 }

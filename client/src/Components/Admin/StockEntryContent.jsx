@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button, TextInput, Select, Table, Modal, Label } from "flowbite-react"
+import { Button, TextInput, Select, Table, Modal, Label, Toast } from "flowbite-react"
 import axios from "axios"
 import { Search } from "lucide-react"
 import { FaBarcode, FaBox, FaTag, FaTags } from "react-icons/fa"
@@ -22,8 +22,9 @@ export default function StockEntryContent() {
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [quantity, setQuantity] = useState(1)
   const [searchTerm, setSearchTerm] = useState("")
+  const [showToast, setShowToast] = useState(false)
+  const [toastMessage, setToastMessage] = useState("")
 
-  // Fetch suppliers list from the API
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
@@ -32,13 +33,13 @@ export default function StockEntryContent() {
         setSuppliers(data)
       } catch (error) {
         console.error("Error fetching suppliers:", error)
+        showToastMessage("Error fetching suppliers")
       }
     }
 
     fetchSuppliers()
   }, [])
 
-  // Fetch supplier details based on selected supplier
   useEffect(() => {
     const fetchSupplierDetails = async () => {
       if (stockEntry.supplier) {
@@ -55,6 +56,7 @@ export default function StockEntryContent() {
           }
         } catch (error) {
           console.error("Error fetching supplier details:", error)
+          showToastMessage("Error fetching supplier details")
         }
       }
     }
@@ -62,29 +64,26 @@ export default function StockEntryContent() {
     fetchSupplierDetails()
   }, [stockEntry.supplier])
 
-  // Generate Reference Number
   const generateReference = () => {
     const timestamp = Date.now()
     setStockEntry((prevState) => ({ ...prevState, referenceNo: timestamp.toString() }))
   }
 
-  // Handle input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target
     setStockEntry((prevState) => ({ ...prevState, [name]: value }))
   }
 
-  // Fetch products
   const fetchProducts = async () => {
     try {
       const response = await axios.get("http://localhost:4000/api/productlist/")
       setProductList(response.data)
     } catch (error) {
       console.error("Error fetching products:", error)
+      showToastMessage("Error fetching products")
     }
   }
 
-  // Add product to the products array
   const addProduct = () => {
     setShowModal(true)
     fetchProducts()
@@ -95,7 +94,6 @@ export default function StockEntryContent() {
     setShowModal(false)
   }
 
-  // Submit stock entry to API and update product quantity
   const handleSubmit = async () => {
     try {
       const stockInData = {
@@ -108,7 +106,6 @@ export default function StockEntryContent() {
       const response = await axios.post("http://localhost:4000/api/stockin/", stockInData)
 
       if (response.status === 201) {
-        // Update product quantity in the product list
         if (selectedProduct) {
           const productResponse = await axios.get(`http://localhost:4000/api/productlist/${selectedProduct._id}`)
           const currentProduct = productResponse.data
@@ -120,8 +117,7 @@ export default function StockEntryContent() {
           })
         }
 
-        alert("Stock In entry added successfully and product quantity updated")
-        // Clear the form or handle success
+        showToastMessage("Stock In entry added successfully and product quantity updated")
         setStockEntry({
           referenceNo: "",
           stockInBy: "fahim1234",
@@ -133,12 +129,18 @@ export default function StockEntryContent() {
         setSelectedProduct(null)
         setQuantity(1)
       } else {
-        alert("Error: " + response.data.message)
+        showToastMessage("Error: " + response.data.message)
       }
     } catch (error) {
       console.error("Error submitting stock entry or updating product quantity:", error)
-      alert("Error submitting stock entry or updating product quantity")
+      showToastMessage("Error submitting stock entry or updating product quantity")
     }
+  }
+
+  const showToastMessage = (message) => {
+    setToastMessage(message)
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 3000)
   }
 
   const filteredProducts = productList.filter(
@@ -152,7 +154,6 @@ export default function StockEntryContent() {
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-2xl font-bold mb-6 text-gray-800">Stock Entry</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {/* Left Column */}
           <div className="space-y-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="referenceNo" className="text-sm font-medium text-gray-700">
@@ -199,7 +200,6 @@ export default function StockEntryContent() {
             </div>
           </div>
 
-          {/* Right Column */}
           <div className="space-y-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="supplier" className="text-sm font-medium text-gray-700">
@@ -258,7 +258,7 @@ export default function StockEntryContent() {
             <TextInput
               id="quantity"
               type="number"
-              value={quantity.toString()} // Convert to string to fix NaN error
+              value={quantity.toString()}
               onChange={(e) => setQuantity(e.target.value === "" ? "" : Number(e.target.value))}
               className="flex-1"
               min="1"
@@ -362,6 +362,13 @@ export default function StockEntryContent() {
             </div>
           </Modal.Body>
         </Modal>
+
+        {/* Toast */}
+        {showToast && (
+          <Toast className="fixed bottom-5 right-5">
+            <div className="text-sm font-normal">{toastMessage}</div>
+          </Toast>
+        )}
       </div>
     </div>
   )

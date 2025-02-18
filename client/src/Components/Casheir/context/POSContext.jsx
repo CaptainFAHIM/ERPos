@@ -31,6 +31,8 @@ export const POSProvider = ({ children }) => {
   const [customerNumber, setCustomerNumber] = useState("")
   const [paymentMethod, setPaymentMethod] = useState("cash")
   const [errorMessage, setErrorMessage] = useState("")
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   useEffect(() => {
     const interval = setInterval(() => setTime(new Date()), 1000)
@@ -189,6 +191,27 @@ export const POSProvider = ({ children }) => {
     setDiscount(newDiscount)
   }, [])
 
+  const refreshComponents = useCallback(() => {
+    setRefreshKey((prevKey) => prevKey + 1)
+  }, [])
+
+  const refreshProducts = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch("http://localhost:4000/api/productlist/")
+      if (!response.ok) {
+        throw new Error("Failed to fetch products")
+      }
+      const data = await response.json()
+      setProducts(data)
+      setRefreshTrigger((prev) => prev + 1)
+    } catch (error) {
+      setError(error.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
   const value = {
     activeTab,
     setActiveTab,
@@ -232,6 +255,10 @@ export const POSProvider = ({ children }) => {
     setPaymentMethod,
     errorMessage,
     setErrorMessage,
+    refreshComponents,
+    refreshKey,
+    refreshProducts,
+    refreshTrigger,
   }
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>

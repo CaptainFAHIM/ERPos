@@ -3,7 +3,7 @@ import User from "../models/users.model.js";
 // Add a new user
 export const addUser = async (req, res) => {
     try {
-        const { username, password, role } = req.body;
+        const { username, password, role, isActive } = req.body;
 
         // Validate role
         if (!["admin", "cashier"].includes(role)) {
@@ -17,16 +17,16 @@ export const addUser = async (req, res) => {
         }
 
         // Create new user
-        const user = new User({ username, password, role });
+        const user = new User({ username, password, role, isActive: isActive ?? true });
         await user.save();
 
         res.status(201).json({ message: "User added successfully", user });
     } catch (error) {
-        res.status(500).json({ message: "Error adding user", error });
+        res.status(500).json({ message: "Error adding user", error: error.message });
     }
 };
 
-// Login user
+// Login user (only if active)
 export const loginUser = async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -37,6 +37,11 @@ export const loginUser = async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
+        // Check if the user is active
+        if (!user.isActive) {
+            return res.status(403).json({ message: "User account is inactive. Contact admin." });
+        }
+
         // Compare passwords (direct comparison)
         if (password !== user.password) {
             return res.status(401).json({ message: "Invalid credentials" });
@@ -45,7 +50,7 @@ export const loginUser = async (req, res) => {
         // Return user details
         res.status(200).json({ message: "Login successful", user });
     } catch (error) {
-        res.status(500).json({ message: "Error logging in", error });
+        res.status(500).json({ message: "Error logging in", error: error.message });
     }
 };
 
@@ -55,7 +60,7 @@ export const getUsers = async (req, res) => {
         const users = await User.find();
         res.status(200).json(users);
     } catch (error) {
-        res.status(500).json({ message: "Error fetching users", error });
+        res.status(500).json({ message: "Error fetching users", error: error.message });
     }
 };
 
@@ -68,7 +73,46 @@ export const getUserById = async (req, res) => {
         }
         res.status(200).json(user);
     } catch (error) {
-        res.status(500).json({ message: "Error fetching user", error });
+        res.status(500).json({ message: "Error fetching user", error: error.message });
+    }
+};
+
+// Update a user by ID
+export const updateUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { username, password, role, isActive } = req.body;
+
+        // Validate role
+        if (role && !["admin", "cashier"].includes(role)) {
+            return res.status(400).json({ message: "Invalid role. Allowed roles: admin, cashier" });
+        }
+
+        // Find the user
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Check if username is changing and already exists
+        if (username && username !== user.username) {
+            const existingUser = await User.findOne({ username });
+            if (existingUser) {
+                return res.status(400).json({ message: "Username already taken" });
+            }
+            user.username = username;
+        }
+
+        // Update fields if provided
+        if (password) user.password = password;
+        if (role) user.role = role;
+        if (isActive !== undefined) user.isActive = isActive;
+
+        await user.save();
+
+        res.status(200).json({ message: "User updated successfully", user });
+    } catch (error) {
+        res.status(500).json({ message: "Error updating user", error: error.message });
     }
 };
 
@@ -81,6 +125,25 @@ export const deleteUser = async (req, res) => {
         }
         res.status(200).json({ message: "User deleted successfully" });
     } catch (error) {
-        res.status(500).json({ message: "Error deleting user", error });
+        res.status(500).json({ message: "Error deleting user", error: error.message });
+    }
+};
+
+// Toggle User Active/Inactive Status
+export const toggleUserStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const user = await User.findById(id);
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        user.isActive = !user.isActive;
+        await user.save();
+
+        res.status(200).json({ message: `User ${user.isActive ? "activated" : "deactivated"} successfully`, user });
+    } catch (error) {
+        res.status(500).json({ message: "Error updating user status", error: error.message });
     }
 };

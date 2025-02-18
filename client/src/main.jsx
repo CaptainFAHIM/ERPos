@@ -18,7 +18,7 @@ const router = createBrowserRouter([
     path: '/',
     element: <Layout />,  
     children: [
-      { path: '', element: <Home /> },
+      { path: '/login', element: <Home /> },
       { path: 'admin', element: <Dashboard /> },
       { path: 'cashier', element: <POSDashboard /> },
       

@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { FaChevronDown, FaChevronRight, FaSignOutAlt, FaMinus } from "react-icons/fa"
-import { motion, AnimatePresence } from "framer-motion"
-import { useNavigate } from "react-router-dom"
+import { useState, useEffect } from "react";
+import { FaChevronDown, FaChevronRight, FaSignOutAlt, FaMinus, FaUserCircle } from "react-icons/fa";
+import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 export default function Sidebar({
   setActiveSection,
@@ -15,37 +15,46 @@ export default function Sidebar({
   isOpen,
   toggleSidebar,
 }) {
-  const [expandedSection, setExpandedSection] = useState(null)
+  const [expandedSection, setExpandedSection] = useState(null);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    // Get user from localStorage
+    const loggedInUser = JSON.parse(localStorage.getItem("user"));
+    setUser(loggedInUser);
+  }, []);
 
   const toggleSection = (section) => {
-    setExpandedSection((prev) => (prev === section ? null : section))
-  }
+    setExpandedSection((prev) => (prev === section ? null : section));
+  };
 
   const handleSectionClick = (section) => {
     if (sections[section].subcategories) {
-      toggleSection(section)
+      toggleSection(section);
     } else {
-      setActiveSection(section)
-      setActiveSubcategory("")
-      if (isMobile) toggleSidebar()
+      setActiveSection(section);
+      setActiveSubcategory("");
+      if (isMobile) toggleSidebar();
     }
-  }
+  };
 
   const handleSubcategoryClick = (section, subcategory) => {
-    setActiveSection(section)
-    setActiveSubcategory(subcategory)
-    if (isMobile) toggleSidebar()
-  }
+    setActiveSection(section);
+    setActiveSubcategory(subcategory);
+    if (isMobile) toggleSidebar();
+  };
 
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   const handleLogout = () => {
-    navigate("/")
-  }
+    localStorage.removeItem("user"); // Clear user data from local storage
+    setUser(null); // Reset user state
+    navigate("/login"); // Redirect to login page
+  };
 
   const sidebarVariants = {
     open: { x: 0 },
     closed: { x: "-100%" },
-  }
+  };
 
   return (
     <AnimatePresence>
@@ -61,13 +70,16 @@ export default function Sidebar({
           transition={{ duration: 0.3 }}
         >
           <div className="p-5">
-            <div className="flex items-center space-x-2 mb-6">
-              <div className="w-12 h-12 bg-white rounded-full"></div>
+            {/* User Info with Icon */}
+            <div className="flex items-center space-x-3 mb-6">
+              <FaUserCircle size={40} className="text-white" /> {/* User Icon */}
               <div>
-                <p className="text-lg font-bold">fahim1234</p>
-                <p className="text-sm">Administrator</p>
+                <p className="text-lg font-bold">{user ? user.username : "Guest"}</p>
+                <p className="text-sm">{user ? user.role : "No Role"}</p>
               </div>
             </div>
+
+            {/* Navigation */}
             <nav className="space-y-2 flex-grow">
               {Object.keys(sections).map((section) => (
                 <div key={section}>
@@ -116,6 +128,8 @@ export default function Sidebar({
               ))}
             </nav>
           </div>
+
+          {/* Logout Button */}
           <button className="mt-auto p-5 flex items-center justify-center hover:bg-green-800" onClick={handleLogout}>
             <FaSignOutAlt size={18} className="mr-2" />
             Logout
@@ -123,6 +137,5 @@ export default function Sidebar({
         </motion.aside>
       )}
     </AnimatePresence>
-  )
+  );
 }
-

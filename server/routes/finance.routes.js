@@ -1,12 +1,12 @@
 import express from "express";
-import { getRevenue, getNetProfit } from "../controllers/finance.controller.js";
+import { getRevenue, getNetProfit, getGrossProfit, getProfit } from "../controllers/finance.controller.js";
 
 const router = express.Router();
 
-// Route to get revenue
 router.get("/revenue", getRevenue);
-
-// Route to get net profit
+router.get("/gross-profit", getGrossProfit);
 router.get("/net-profit", getNetProfit);
+router.get("/profit", getProfit); // NEW Route for both profits
 
 export default router;
+

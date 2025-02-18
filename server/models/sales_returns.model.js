@@ -1,14 +1,35 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
-const ReturnItemSchema = new mongoose.Schema({
-  barcode: { type: String, required: true, unique: true },
-  product: { type: String, required: true },
-  category: { type: String, required: true },
-  brand: { type: String, required: true },
-  price: { type: Number, required: true },
-  quantity: { type: Number, required: true },
-  returnReason: { type: String, required: true },
-  createdAt: { type: Date, default: Date.now }
-});
+const ReturnSchema = new mongoose.Schema(
+  {
+    transactionNo: {
+      type: String,
+      required: true,
+    },
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      required: true,
+    },
+    returnQuantity: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    returnReason: {
+      type: String,
+      required: true,
+    },
+    refundedAmount: {
+      type: Number,
+      required: true,
+    },
+    returnedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { timestamps: true }
+);
 
-export default mongoose.model('ReturnItem', ReturnItemSchema);
+export default mongoose.model("Return", ReturnSchema);

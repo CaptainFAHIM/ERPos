@@ -11,12 +11,11 @@ const saleSchema = new mongoose.Schema({
         }
     ],
     totalAmount: { type: Number, required: true }, // Total price before discount
-    discount: { type: Number, default: 0 }, // Discount applied (default is 0)
+    discount: { type: Number, default: 0 }, // Discount applied
     finalAmount: { type: Number, required: true }, // Final amount after discount
     paymentMethod: { type: String, enum: ['cash', 'card'], required: true },
     customerName: { type: String, required: true },
     customerNumber: { type: String, required: false }
 }, { timestamps: true });
 
-const Sale = mongoose.model('Sale', saleSchema);
-export default Sale;
+export default mongoose.model('Sale', saleSchema);

@@ -1,5 +1,8 @@
 import mongoose from 'mongoose';
-import AutoIncrement from 'mongoose-sequence';
+import mongooseSequence from 'mongoose-sequence';
+
+// Pass mongoose to mongoose-sequence
+const AutoIncrement = mongooseSequence(mongoose);
 
 const productSchema = new mongoose.Schema({
     barcode: { type: String, required: true, unique: true },
@@ -11,8 +14,8 @@ const productSchema = new mongoose.Schema({
     totalQuantity: { type: Number, required: true }
 }, { timestamps: true });
 
-// Auto-incrementing ID
-productSchema.plugin(AutoIncrement(mongoose), { inc_field: 'productId' });
+// Apply Auto-Increment Plugin
+productSchema.plugin(AutoIncrement, { inc_field: 'productId' });
 
 const Product = mongoose.model('Product', productSchema);
 export default Product;

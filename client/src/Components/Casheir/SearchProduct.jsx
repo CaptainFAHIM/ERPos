@@ -1,12 +1,31 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { usePOSContext } from "./context/POSContext"
-import { FaEye, FaEyeSlash } from "react-icons/fa"
+import { FaEye, FaEyeSlash, FaSync } from "react-icons/fa"
 
 const SearchProduct = () => {
-  const { products, searchTerm, setSearchTerm, addToCart, errorMessage } = usePOSContext()
+  const { products, searchTerm, setSearchTerm, addToCart, errorMessage, refreshProducts, refreshTrigger } =
+    usePOSContext()
   const [showPurchasePrice, setShowPurchasePrice] = useState({})
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [filteredProducts, setFilteredProducts] = useState([])
+
+  useEffect(() => {
+    setFilteredProducts(
+      products.filter(
+        (product) =>
+          product.description.toLowerCase().includes(searchTerm.toLowerCase()) || product.barcode.includes(searchTerm),
+      ),
+    )
+  }, [products, searchTerm])
+
+  const handleRefresh = () => {
+    setIsRefreshing(true)
+    refreshProducts().then(() => {
+      setIsRefreshing(false)
+    })
+  }
 
   const togglePurchasePrice = (productId) => {
     setShowPurchasePrice((prev) => ({
@@ -17,7 +36,19 @@ const SearchProduct = () => {
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4">Search Product</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold">Search Product</h2>
+        <button
+          onClick={handleRefresh}
+          className={`px-4 py-2 bg-indigo-600 text-white rounded-md flex items-center ${
+            isRefreshing ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-700"
+          }`}
+          disabled={isRefreshing}
+        >
+          <FaSync className={`mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </button>
+      </div>
       <input
         type="text"
         className="w-full p-2 border rounded-md mb-4"
@@ -39,48 +70,42 @@ const SearchProduct = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {products
-              .filter(
-                (product) =>
-                  product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  product.barcode.includes(searchTerm),
-              )
-              .map((product) => (
-                <tr key={product._id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.barcode}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.description}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.category}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.brand}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center">
-                      ৳{product.sellPrice.toFixed(2)}
-                      <button
-                        onClick={() => togglePurchasePrice(product._id)}
-                        className="ml-2 text-gray-500 hover:text-gray-700"
-                      >
-                        {showPurchasePrice[product._id] ? <FaEyeSlash /> : <FaEye />}
-                      </button>
-                    </div>
-                    {showPurchasePrice[product._id] && (
-                      <div className="text-xs text-gray-500 mt-1">Purchase: ৳{product.purchasePrice.toFixed(2)}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.totalQuantity}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+            {filteredProducts.map((product) => (
+              <tr key={product._id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.barcode}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.description}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.category}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.brand}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <div className="flex items-center">
+                    ৳{product.sellPrice.toFixed(2)}
                     <button
-                      className={`px-3 py-1 rounded ${
-                        product.totalQuantity > 0
-                          ? "bg-blue-500 text-white hover:bg-blue-600"
-                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      }`}
-                      onClick={() => product.totalQuantity > 0 && addToCart(product)}
-                      disabled={product.totalQuantity <= 0}
+                      onClick={() => togglePurchasePrice(product._id)}
+                      className="ml-2 text-gray-500 hover:text-gray-700"
                     >
-                      {product.totalQuantity > 0 ? "Add to Cart" : "Out of Stock"}
+                      {showPurchasePrice[product._id] ? <FaEyeSlash /> : <FaEye />}
                     </button>
-                  </td>
-                </tr>
-              ))}
+                  </div>
+                  {showPurchasePrice[product._id] && (
+                    <div className="text-xs text-gray-500 mt-1">Purchase: ৳{product.purchasePrice.toFixed(2)}</div>
+                  )}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.totalQuantity}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <button
+                    className={`px-3 py-1 rounded ${
+                      product.totalQuantity > 0
+                        ? "bg-blue-500 text-white hover:bg-blue-600"
+                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    }`}
+                    onClick={() => product.totalQuantity > 0 && addToCart(product)}
+                    disabled={product.totalQuantity <= 0}
+                  >
+                    {product.totalQuantity > 0 ? "Add to Cart" : "Out of Stock"}
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

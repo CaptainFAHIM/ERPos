@@ -24,7 +24,10 @@ import cartRoutes from './routes/cart.routes.js';
 import transactionRoutes from './routes/transaction.routes.js';
 import financeRoutes from "./routes/finance.routes.js";
 import productRoutes from './routes/lowstockreport.routes.js';
-
+import stockRoutes from './routes/stock.routes.js';
+import saleProfitRoutes from './routes/sale-profit.routes.js';
+import productCategoryRoutes from './routes/productcategory.routes.js';
+import summaryRoutes from './routes/summary.routes.js';
 
 app.use('/api/users', usersRoutes);
 app.use('/api/productlist', productlistRoutes);
@@ -39,6 +42,8 @@ app.use("/api/storeSettings", storeSettingsRoutes);
 app.use('/api/return-items', returnItemRoutes);
 app.use('/api/payments', paySupplierRoutes);
 app.use('/api/lowstock', productRoutes);
+app.use('/api/stock-value', stockRoutes);
+
 
 
 // For selling products
@@ -50,6 +55,11 @@ app.use("/api/sales", salesRoutes)
 
 //finance routes
  app.use("/api/finance", financeRoutes);
+ app.use("/api/sales-profit", saleProfitRoutes);
+ app.use('/api/summary-report', summaryRoutes);
+
+//for calculatoin the numbers of category 
+ app.use('/api/productscategory', productCategoryRoutes);
 
 //handle error
 app.use((err,req,res,next)=>{

@@ -25,6 +25,8 @@ import AllExpensses from "./AllExpensses"
 import AddPaymentContent from "./AddPaymentContent"
 import AllPaymentsContent from "./AllPaymentsContent"
 import BarcodeGenerator from "./BarcodeGenaratro"
+import POSDetails from "./SoftwareVersion"
+import SoftwareVersion from "./SoftwareVersion"
 
 export const sections = {
   Dashboard: {
@@ -92,6 +94,7 @@ export const sections = {
     subcategories: {
       User: <UserContent />,
       Store: <StoreContent />,
+      About: <SoftwareVersion />,
     },
   },
 }

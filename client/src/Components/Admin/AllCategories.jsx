@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Table, Button, Card, TextInput, Modal, Label } from "flowbite-react"
+import { Table, Button, Card, TextInput, Modal, Label, Spinner } from "flowbite-react"
 import { FaEdit, FaTrash, FaSearch, FaPlus } from "react-icons/fa"
 
 export default function AllCategories() {
@@ -103,7 +103,11 @@ export default function AllCategories() {
     category.categoryName.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  if (loading) return <div>Loading...</div>
+  if (loading) return (
+     <div className="flex items-center justify-center min-h-screen">
+       <Spinner aria-label="Loading..." size="xl" />
+     </div>
+   );
   if (error) return <div>{error}</div>
 
   return (
@@ -136,41 +140,42 @@ export default function AllCategories() {
         />
       </div>
 
-      <div className="overflow-x-auto">
-        <Table striped>
-          <Table.Head>
-            <Table.HeadCell>Category Name</Table.HeadCell>
-            <Table.HeadCell>Actions</Table.HeadCell>
-          </Table.Head>
-          <Table.Body>
-            {filteredCategories.map((category) => (
-              <Table.Row key={category._id}>
-                <Table.Cell>{category.categoryName}</Table.Cell>
-                <Table.Cell>
-                  <div className="flex space-x-2">
-                    <Button
-                      color="info"
-                      size="sm"
-                      className="rounded-l-lg rounded-r-none"
-                      onClick={() => handleEdit(category)}
-                    >
-                      <FaEdit />
-                    </Button>
-                    <Button
-                      color="failure"
-                      size="sm"
-                      className="rounded-l-none rounded-r-lg"
-                      onClick={() => handleDelete(category._id)}
-                    >
-                      <FaTrash />
-                    </Button>
-                  </div>
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table>
-      </div>
+      <div className="overflow-x-auto rounded-2xl shadow-sm border border-gray-300 bg-white">
+  <Table hoverable className="w-full">
+    <Table.Head className="bg-gradient-to-r from-blue-100 to-gray-200">
+      <Table.HeadCell className="text-gray-900 font-bold text-lg py-3">Category Name</Table.HeadCell>
+      <Table.HeadCell className="text-gray-900 font-bold text-lg py-3">Actions</Table.HeadCell>
+    </Table.Head>
+    <Table.Body className="divide-y divide-gray-200">
+      {filteredCategories.map((category) => (
+        <Table.Row key={category._id} className="hover:bg-gray-100 transition-all duration-200">
+          <Table.Cell className="py-3 px-4 text-gray-700">{category.categoryName}</Table.Cell>
+          <Table.Cell className="py-3 px-4">
+            <div className="flex space-x-2">
+              <Button
+                color="info"
+                size="sm"
+                className="rounded-full px-1 shadow-md flex items-center gap-2"
+                onClick={() => handleEdit(category)}
+              >
+                <FaEdit />
+              </Button>
+              <Button
+                color="failure"
+                size="sm"
+                className="rounded-full px-1 shadow-md flex items-center gap-2"
+                onClick={() => handleDelete(category._id)}
+              >
+                <FaTrash />
+              </Button>
+            </div>
+          </Table.Cell>
+        </Table.Row>
+      ))}
+    </Table.Body>
+  </Table>
+</div>
+
 
       <Modal show={showEditModal} onClose={() => setShowEditModal(false)}>
         <Modal.Header>Edit Category</Modal.Header>

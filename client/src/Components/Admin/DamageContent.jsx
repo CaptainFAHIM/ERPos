@@ -168,7 +168,7 @@ function DamageContent() {
                 <Table.Cell>{record.product}</Table.Cell>
                 <Table.Cell>{record.category}</Table.Cell>
                 <Table.Cell>{record.brand}</Table.Cell>
-                <Table.Cell>${record.price}</Table.Cell>
+                <Table.Cell>{record.price}</Table.Cell>
                 <Table.Cell>{record.quantity}</Table.Cell>
                 <Table.Cell>{record.reason}</Table.Cell>
                 <Table.Cell>

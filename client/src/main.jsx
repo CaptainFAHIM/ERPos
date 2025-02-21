@@ -11,6 +11,7 @@ import { PersistGate } from 'redux-persist/integration/react';
 import { store, persistor } from './Redux/Store/Store';  
 import Dashboard from './Components/Admin/Dashboard';
 import POSDashboard from './Components/Casheir/POSDashboard';
+import InvoiceReceipt from './Components/test/test';
 
 // Define your routes
 const router = createBrowserRouter([
@@ -21,6 +22,7 @@ const router = createBrowserRouter([
       { path: '/login', element: <Home /> },
       { path: 'admin', element: <Dashboard /> },
       { path: 'cashier', element: <POSDashboard /> },
+      { path: 'test', element: <InvoiceReceipt /> },
       
     ],
   },

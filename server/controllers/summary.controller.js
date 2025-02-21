@@ -1,83 +1,198 @@
-import Product from "../models/productlist.model.js";
-import Sale from "../models/sales.model.js";
-import Expense from "../models/expense.model.js";
-import DamageProduct from "../models/damageproduct.model.js";
-import mongoose from "mongoose";
+// controllers/summaryController.js
+import Product from '../models/productlist.model.js';
+import Sale from '../models/sales.model.js';
+import Expense from '../models/expense.model.js';
+import DamageProduct from '../models/damageproduct.model.js';
 
-// Generate Summary Report
-export const getSummaryReport = async (req, res) => {
-  try {
-    // 1. Get total sales amount
-    const totalSales = await Sale.aggregate([
-      { $group: { _id: null, totalSalesAmount: { $sum: "$finalAmount" } } }
-    ]);
-    const totalSalesAmount = totalSales.length > 0 ? totalSales[0].totalSalesAmount : 0;
+const getDateRange = (startDate, endDate) => {
+    let start = startDate ? new Date(startDate) : new Date(0);
+    let end = endDate ? new Date(endDate) : new Date();
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+};
 
-    // 2. Get total expenses amount
-    const totalExpenses = await Expense.aggregate([
-      { $group: { _id: null, totalExpenseAmount: { $sum: "$expenseAmount" } } }
-    ]);
-    const totalExpenseAmount = totalExpenses.length > 0 ? totalExpenses[0].totalExpenseAmount : 0;
+export const getTotalSales = async (req, res) => {
+    try {
+        const { start, end } = getDateRange(req.query.startDate, req.query.endDate);
+        const totalSales = await Sale.aggregate([
+            { $match: { createdAt: { $gte: start, $lte: end } } },
+            { $group: { _id: null, totalSalesAmount: { $sum: '$finalAmount' } } }
+        ]);
+        res.json({ totalSalesAmount: totalSales.length ? totalSales[0].totalSalesAmount : 0 });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching total sales', error });
+    }
+};
 
-    // 3. Get total stock value (quantity * sell price)
-    const products = await Product.find();
-    let totalStockValue = 0;
-    products.forEach((product) => {
-      totalStockValue += product.totalQuantity * product.sellPrice;
-    });
+export const getTotalExpenses = async (req, res) => {
+    try {
+        const { start, end } = getDateRange(req.query.startDate, req.query.endDate);
+        const totalExpenses = await Expense.aggregate([
+            { $match: { createdAt: { $gte: start, $lte: end } } },
+            { $group: { _id: null, totalExpenseAmount: { $sum: '$expenseAmount' } } }
+        ]);
+        res.json({ totalExpenseAmount: totalExpenses.length ? totalExpenses[0].totalExpenseAmount : 0 });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching total expenses', error });
+    }
+};
 
-    // 4. Get total damaged product value (quantity * price)
-    const damagedProducts = await DamageProduct.aggregate([
-      { $group: { _id: null, totalDamageValue: { $sum: { $multiply: ["$quantity", "$price"] } } } }
-    ]);
-    const totalDamageValue = damagedProducts.length > 0 ? damagedProducts[0].totalDamageValue : 0;
+export const getTotalStockValue = async (req, res) => {
+    try {
+        const products = await Product.find();
+        const totalStockValue = products.reduce((acc, product) => acc + (product.totalQuantity * product.sellPrice), 0);
+        res.json({ totalStockValue });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching total stock value', error });
+    }
+};
 
-    // 5. Get total transactions (count of sales)
-    const totalTransactions = await Sale.countDocuments();
+export const getTotalDamageValue = async (req, res) => {
+    try {
+        const { start, end } = getDateRange(req.query.startDate, req.query.endDate);
+        const damagedProducts = await DamageProduct.aggregate([
+            { $match: { createdAt: { $gte: start, $lte: end } } },
+            { $group: { _id: null, totalDamageValue: { $sum: { $multiply: ['$quantity', '$price'] } } } }
+        ]);
+        res.json({ totalDamageValue: damagedProducts.length ? damagedProducts[0].totalDamageValue : 0 });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching total damage value', error });
+    }
+};
 
-    // 6. Calculate COGS (Cost of Goods Sold)
-    let totalCOGS = 0;
-    const sales = await Sale.find().populate("products.productId");
-    sales.forEach((sale) => {
-      sale.products.forEach((product) => {
-        const productInfo = product.productId;
-        const quantitySold = product.quantity;
-        totalCOGS += productInfo.purchasePrice * quantitySold;
-      });
-    });
+export const getTotalRevenue = async (req, res) => {
+    try {
+        const { start, end } = getDateRange(req.query.startDate, req.query.endDate);
 
-    // 7. Calculate profit (Gross Profit = Sales - COGS, Net Profit = Gross Profit - Expenses)
-    const grossProfit = totalSalesAmount - totalCOGS;
-    const netProfit = grossProfit - totalExpenseAmount;
+        const totalRevenue = await Sale.aggregate([
+            { $match: { createdAt: { $gte: start, $lte: end } } },
+            { $group: { _id: null, totalRevenue: { $sum: '$finalAmount' } } }
+        ]);
 
-    // 8. Get Monthly Revenue (total sales amount for the current month)
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    
-    const monthlySales = await Sale.aggregate([
-      { $match: { createdAt: { $gte: startOfMonth } } },
-      { $group: { _id: null, monthlyRevenue: { $sum: "$finalAmount" } } }
-    ]);
-    const monthlyRevenue = monthlySales.length > 0 ? monthlySales[0].monthlyRevenue : 0;
+        res.json({ totalRevenue: totalRevenue.length ? totalRevenue[0].totalRevenue : 0 });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching total revenue', error });
+    }
+};
 
-    // 9. Compile the Summary Report
-    const summaryReport = {
-      totalSalesAmount,
-      totalExpenseAmount,
-      totalStockValue,
-      totalDamageValue,
-      totalTransactions,
-      profit: netProfit,  // Net Profit is now the overall profit value
-      monthlyRevenue,
-      grossProfit,
-      netProfit
-    };
 
-    // Return the summary report
-    res.status(200).json({ message: "Summary Report generated successfully", summaryReport });
-  } catch (error) {
-    console.error("Error generating Summary Report:", error); // Log the error to the console
-    res.status(500).json({ message: "Error generating Summary Report", error: error.message });
-  }
+export const getTotalTransactions = async (req, res) => {
+    try {
+        const { start, end } = getDateRange(req.query.startDate, req.query.endDate);
+        const totalTransactions = await Sale.countDocuments({ createdAt: { $gte: start, $lte: end } });
+        res.json({ totalTransactions });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching total transactions', error });
+    }
+};
+
+export const getCOGS = async (req, res) => {
+    try {
+        const { start, end } = getDateRange(req.query.startDate, req.query.endDate);
+        const sales = await Sale.find({ createdAt: { $gte: start, $lte: end } }).populate('products.productId');
+        const totalCOGS = sales.reduce((acc, sale) => acc + sale.products.reduce((subAcc, product) => subAcc + (product.productId.purchasePrice * product.quantity), 0), 0);
+        res.json({ totalCOGS });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching COGS', error });
+    }
+};
+
+export const getGrossProfit = async (req, res) => {
+    try {
+        const { start, end } = getDateRange(req.query.startDate, req.query.endDate);
+
+        // Fetch total sales
+        const totalSales = await Sale.aggregate([
+            { $match: { createdAt: { $gte: start, $lte: end } } },
+            { $group: { _id: null, totalSalesAmount: { $sum: '$finalAmount' } } }
+        ]);
+
+        // Fetch COGS (Cost of Goods Sold)
+        const sales = await Sale.find({ createdAt: { $gte: start, $lte: end } }).populate('products.productId');
+        const totalCOGS = sales.reduce((acc, sale) =>
+            acc + sale.products.reduce((subAcc, product) =>
+                subAcc + (product.productId.purchasePrice * product.quantity), 0
+            ), 0
+        );
+
+        // Calculate Gross Profit
+        const grossProfit = (totalSales.length ? totalSales[0].totalSalesAmount : 0) - totalCOGS;
+
+        res.json({ grossProfit });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching gross profit', error });
+    }
+};
+
+
+export const getNetProfit = async (req, res) => {
+    try {
+        const { start, end } = getDateRange(req.query.startDate, req.query.endDate);
+
+        // Fetch Gross Profit
+        const totalSales = await Sale.aggregate([
+            { $match: { createdAt: { $gte: start, $lte: end } } },
+            { $group: { _id: null, totalSalesAmount: { $sum: '$finalAmount' } } }
+        ]);
+
+        const sales = await Sale.find({ createdAt: { $gte: start, $lte: end } }).populate('products.productId');
+        const totalCOGS = sales.reduce((acc, sale) =>
+            acc + sale.products.reduce((subAcc, product) =>
+                subAcc + (product.productId.purchasePrice * product.quantity), 0
+            ), 0
+        );
+
+        const grossProfit = (totalSales.length ? totalSales[0].totalSalesAmount : 0) - totalCOGS;
+
+        // Fetch Total Expenses
+        const totalExpenses = await Expense.aggregate([
+            { $match: { createdAt: { $gte: start, $lte: end } } },
+            { $group: { _id: null, totalExpenseAmount: { $sum: '$expenseAmount' } } }
+        ]);
+
+        // Calculate Net Profit
+        const netProfit = grossProfit - (totalExpenses.length ? totalExpenses[0].totalExpenseAmount : 0);
+
+        res.json({ netProfit });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching net profit', error });
+    }
+};
+
+
+export const getMonthlyRevenue = async (req, res) => {
+    try {
+        const now = new Date();
+        const firstDayOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDayOfCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+        const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+        const currentMonthSales = await Sale.aggregate([
+            { $match: { createdAt: { $gte: firstDayOfCurrentMonth, $lte: lastDayOfCurrentMonth } } },
+            { $group: { _id: null, revenue: { $sum: '$finalAmount' } } }
+        ]);
+
+        const lastMonthSales = await Sale.aggregate([
+            { $match: { createdAt: { $gte: firstDayOfLastMonth, $lte: lastDayOfLastMonth } } },
+            { $group: { _id: null, revenue: { $sum: '$finalAmount' } } }
+        ]);
+
+        const currentRevenue = currentMonthSales.length ? currentMonthSales[0].revenue : 0;
+        const lastRevenue = lastMonthSales.length ? lastMonthSales[0].revenue : 0;
+        
+        let growth = 0;
+        if (lastRevenue !== 0) {
+            growth = ((currentRevenue - lastRevenue) / lastRevenue) * 100;
+        }
+
+        res.json({
+            currentMonthRevenue: currentRevenue,
+            lastMonthRevenue: lastRevenue,
+            growthPercentage: growth.toFixed(2)
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching monthly revenue', error });
+    }
 };

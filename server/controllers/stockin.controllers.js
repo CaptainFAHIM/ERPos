@@ -1,35 +1,11 @@
 import StockIn from "../models/stockin.model.js";
-import Product from "../models/productlist.model.js"; // Import Product model
-import mongoose from "mongoose";
-
-// Create a new stock-in entry
-export const createStockIn = async (req, res) => {
-  try {
-    const { referenceNo, supplier, stockInBy, stockInDate, contactPerson, address, productName, barcode, quantity } = req.body;
-
-    // Create a new StockIn entry
-    const stockIn = new StockIn({ referenceNo, supplier, stockInBy, stockInDate, contactPerson, address, productName, barcode, quantity });
-    await stockIn.save();
-
-    // Update the Product quantity
-    const product = await Product.findOne({ barcode });
-    if (product) {
-      product.totalQuantity += quantity;
-      await product.save();
-    } else {
-      return res.status(404).json({ message: "Product not found" });
-    }
-
-    res.status(201).json({ message: "Stock In entry added successfully", stockIn });
-  } catch (error) {
-    res.status(500).json({ message: "Error adding Stock In entry", error });
-  }
-};
+import Product from "../models/productlist.model.js";
+import mongoose from "mongoose"; 
 
 // Get all stock-in entries
 export const getAllStockIn = async (req, res) => {
   try {
-    const stockInEntries = await StockIn.find();
+    const stockInEntries = await StockIn.find().sort({ createdAt: -1 }); 
     res.status(200).json(stockInEntries);
   } catch (error) {
     console.error("Error fetching Stock In entries:", error);
@@ -37,11 +13,32 @@ export const getAllStockIn = async (req, res) => {
   }
 };
 
+// Create a new stock-in entry and update product quantity
+export const createStockIn = async (req, res) => {
+  try {
+    const { referenceNo, supplier, stockInBy, stockInDate, contactPerson, address, productName, barcode, quantity } = req.body;
+
+    const product = await Product.findOne({ barcode });
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    const stockIn = new StockIn({ referenceNo, supplier, stockInBy, stockInDate, contactPerson, address, productName, barcode, quantity });
+    await stockIn.save();
+
+    product.totalQuantity += quantity;
+    await product.save();
+
+    res.status(201).json({ message: "Stock In entry added successfully", stockIn });
+  } catch (error) {
+    res.status(500).json({ message: "Error adding Stock In entry", error });
+  }
+};
+
 // Get stock-in entry by ID
 export const getStockInById = async (req, res) => {
   try {
     const { id } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid Stock In ID format" });
     }
@@ -55,11 +52,11 @@ export const getStockInById = async (req, res) => {
   }
 };
 
-// Update stock-in entry
+// Update stock-in entry and adjust product quantity
 export const updateStockIn = async (req, res) => {
   try {
     const { id } = req.params;
-    const { referenceNo, supplier, stockInBy, stockInDate, contactPerson, address, productName, barcode } = req.body;
+    const { referenceNo, supplier, stockInBy, stockInDate, contactPerson, address, productName, barcode, quantity } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid Stock In ID format" });
@@ -68,10 +65,12 @@ export const updateStockIn = async (req, res) => {
     const stockIn = await StockIn.findById(id);
     if (!stockIn) return res.status(404).json({ message: "Stock In entry not found" });
 
-    // Calculate the quantity difference based on the stock-in quantity that is being updated
-    const quantityDifference = req.body.quantity - stockIn.quantity;
-    
-    // Update the StockIn entry
+    const product = await Product.findOne({ barcode });
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    // Calculate quantity difference
+    const quantityDifference = quantity - stockIn.quantity;
+
     stockIn.referenceNo = referenceNo;
     stockIn.supplier = supplier;
     stockIn.stockInBy = stockInBy;
@@ -80,18 +79,12 @@ export const updateStockIn = async (req, res) => {
     stockIn.address = address;
     stockIn.productName = productName;
     stockIn.barcode = barcode;
-
-    // Save updated stock-in entry
+    stockIn.quantity = quantity;
     await stockIn.save();
 
-    // Update the Product quantity based on the quantity difference
-    const product = await Product.findOne({ barcode });
-    if (product) {
-      product.totalQuantity += quantityDifference;
-      await product.save();
-    } else {
-      return res.status(404).json({ message: "Product not found" });
-    }
+    // Adjust product quantity
+    product.totalQuantity += quantityDifference;
+    await product.save();
 
     res.status(200).json({ message: "Stock In entry updated successfully", stockIn });
   } catch (error) {
@@ -99,27 +92,25 @@ export const updateStockIn = async (req, res) => {
   }
 };
 
-
-// Delete stock-in entry
+// Delete stock-in entry and subtract product quantity
 export const deleteStockIn = async (req, res) => {
   try {
     const { id } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid Stock In ID format" });
     }
 
-    const stockIn = await StockIn.findByIdAndDelete(id);
+    const stockIn = await StockIn.findById(id);
     if (!stockIn) return res.status(404).json({ message: "Stock In entry not found" });
 
-    // Update the Product quantity when a stock-in entry is deleted
     const product = await Product.findOne({ barcode: stockIn.barcode });
-    if (product) {
-      product.totalQuantity -= stockIn.quantity;
-      await product.save();
-    } else {
-      return res.status(404).json({ message: "Product not found" });
-    }
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    product.totalQuantity -= stockIn.quantity;
+    if (product.totalQuantity < 0) product.totalQuantity = 0;
+    await product.save();
+
+    await stockIn.deleteOne();
 
     res.status(200).json({ message: "Stock In entry deleted successfully" });
   } catch (error) {

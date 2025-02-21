@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { usePOSContext } from "./context/POSContext" // Assuming you have this context
 import { FaEye, FaUndo } from "react-icons/fa"
+import { Spinner } from "flowbite-react"
 
 const DailySales = () => {
   const { dailySales, setDailySales } = usePOSContext()
@@ -14,13 +15,16 @@ const DailySales = () => {
   const [returnQuantity, setReturnQuantity] = useState(1)
   const [returnProductId, setReturnProductId] = useState("")
   const [returnTransactionNo, setReturnTransactionNo] = useState("")
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchDailySales = async () => {
       try {
         const response = await fetch("http://localhost:4000/api/sales/")
+        setLoading(false)
         if (!response.ok) {
           throw new Error("Failed to fetch sales data")
+          
         }
         const data = await response.json()
 
@@ -38,7 +42,11 @@ const DailySales = () => {
     fetchDailySales()
   }, [setDailySales])
 
-  if (isLoading) return <div>Loading...</div>
+ if (loading) return (
+    <div className="flex items-center justify-center min-h-screen">
+      <Spinner aria-label="Loading..." size="xl" />
+    </div>
+  );
   if (error) return <div>Error: {error}</div>
 
   // Function to open modal with selected sale details

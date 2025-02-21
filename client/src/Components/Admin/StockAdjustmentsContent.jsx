@@ -109,10 +109,8 @@ export default function StockAdjustmentsContent() {
         {/* Header with Stock Adjustment title */}
         <div className="flex justify-between mb-6">
           <div className="flex items-center">
-            <FaUser className="text-2xl mr-2" />
-            <span className="text-lg">fahim1234</span>
+          <h2 className="text-2xl  font-bold text-right">Stock Adjustment</h2>
           </div>
-          <h2 className="text-xl font-semibold text-right">Stock Adjustment</h2>
         </div>
 
         <div className="mb-6">

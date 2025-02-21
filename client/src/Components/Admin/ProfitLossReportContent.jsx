@@ -11,35 +11,37 @@ export default function ProfitLossReportContent() {
   const [showGrowth, setShowGrowth] = useState(true); // State for toggling growth percentage visibility
 
   useEffect(() => {
-    fetch(`http://localhost:4000/api/finance/revenue?monthOffset=0`)
-      .then(response => response.json())
-      .then(data => {
-        setRevenue(data.revenue || 0);
+    // Fetching current month's revenue and net profit from separate routes
+    fetch("http://localhost:4000/api/summary-report/monthly-revenue")
+      .then((response) => response.json())
+      .then((data) => {
+        setRevenue(data.currentMonthRevenue || 0);
       });
 
-    fetch(`http://localhost:4000/api/finance/net-profit?monthOffset=0`)
-      .then(response => response.json())
-      .then(data => {
+    fetch("http://localhost:4000/api/summary-report/net-profit")
+      .then((response) => response.json())
+      .then((data) => {
         setNetProfit(data.netProfit || 0);
       });
   }, []);
 
   useEffect(() => {
-    fetch("http://localhost:4000/api/finance/revenue?monthOffset=-1")
-      .then(response => response.json())
-      .then(prevData => {
-        const prevRevenue = prevData.revenue || 0;
+    // Fetching previous month's revenue and net profit for calculating growth
+    fetch("http://localhost:4000/api/summary-report/monthly-revenue?monthOffset=-1")
+      .then((response) => response.json())
+      .then((prevData) => {
+        const prevRevenue = prevData.currentMonthRevenue || 0;
         setRevenueGrowth(prevRevenue !== 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0);
       });
 
-    fetch("http://localhost:4000/api/finance/net-profit?monthOffset=-1")
-      .then(response => response.json())
-      .then(prevData => {
+    fetch("http://localhost:4000/api/summary-report/net-profit?monthOffset=-1")
+      .then((response) => response.json())
+      .then((prevData) => {
         const prevProfit = prevData.netProfit || 0;
         setProfitGrowth(prevProfit !== 0 ? ((netProfit - prevProfit) / prevProfit) * 100 : 0);
       });
 
-    setExpenses(revenue - netProfit);
+    setExpenses(revenue - netProfit); // Assuming expenses are the difference between revenue and net profit
   }, [revenue, netProfit]);
 
   return (

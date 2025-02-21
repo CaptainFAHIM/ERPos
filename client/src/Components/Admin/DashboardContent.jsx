@@ -105,9 +105,9 @@ export default function PremiumDashboard() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="text-4xl font-bold text-gray-800 mb-8"
+        className="text-4xl font-bold  text-gray-700 mb-8"
       >
-        Premium Dashboard
+        Dashboard
       </motion.h1>
 
       <SummaryCards setError={setError} />

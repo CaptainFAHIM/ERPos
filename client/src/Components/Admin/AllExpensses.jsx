@@ -1,9 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Table, Button, Card, TextInput, Modal, Label } from "flowbite-react"
+import { Table, Button, Card, TextInput, Modal, Label, Spinner } from "flowbite-react"
 import { FaEdit, FaTrash, FaSearch, FaPrint } from "react-icons/fa"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import { FaMoneyBillWave, FaCalendarAlt } from "react-icons/fa";
+import { FaChartLine } from "react-icons/fa";
+import { FaChartBar } from "react-icons/fa";
+// import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 
 export default function AllExpenses() {
   const [expenses, setExpenses] = useState([])
@@ -128,34 +132,66 @@ export default function AllExpenses() {
     window.location.reload()
   }
 
-  if (loading) return <div>Loading...</div>
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-screen">
+      <Spinner aria-label="Loading..." size="xl" />
+    </div>
+  );
   if (error) return <div>{error}</div>
 
   return (
     <div className="container mx-auto p-4">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <Card>
-          <h5 className="text-xl font-bold mb-2">Expense History</h5>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="amount" stroke="#0891b2" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-        <Card>
-          <h5 className="text-xl font-bold mb-2">Expense Summary</h5>
-          <div className="space-y-2">
-            <p>Total Expenses: ৳{summary.total}</p>
-            <p>This Month: ৳{summary.thisMonth}</p>
-          </div>
-        </Card>
+      <Card className="shadow-xl border border-gray-300 rounded-2xl p-6 bg-gradient-to-br from-blue-50 to-gray-100">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <FaChartBar className="text-blue-600 bg-blue-100 p-3 rounded-full shadow-md" size={45} />
+          <h5 className="text-2xl font-extrabold text-gray-900">Expense History</h5>
+        </div>
+      </div>
+
+      <div className="h-72 bg-white rounded-2xl shadow-lg p-4">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} barGap={10} barCategoryGap={20}>
+            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.3} />
+            <XAxis dataKey="month" tick={{ fill: "#374151", fontSize: 14, fontWeight: "bold" }} />
+            <YAxis tick={{ fill: "#374151", fontSize: 14, fontWeight: "bold" }} />
+            <Tooltip contentStyle={{ backgroundColor: "#f8fafc", borderRadius: "10px", border: "1px solid #ddd" }} />
+            <Legend />
+            <Bar dataKey="amount" fill="url(#blueGradient)" radius={[10, 10, 0, 0]} barSize={50} />
+            <defs>
+              <linearGradient id="blueGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#0ea5e9" />
+                <stop offset="100%" stopColor="#0369a1" />
+              </linearGradient>
+            </defs>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
+        <Card className="shadow-lg border border-gray-200 rounded-2xl p-6 bg-gradient-to-br from-red-50 to-gray-100">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <FaMoneyBillWave className="text-red-600 bg-red-100 p-2 rounded-full shadow-md" size={40} />
+          <h5 className="text-2xl font-extrabold text-gray-900">Expense Summary</h5>
+        </div>
+      </div>
+      
+      <div className="space-y-4">
+        <div className="flex items-center justify-between bg-red-200 p-4 rounded-xl shadow-sm">
+          <span className="text-gray-700 font-semibold text-lg">Total Expenses:</span>
+          <span className="text-red-700 font-extrabold text-2xl">৳{summary.total.toLocaleString()}</span>
+        </div>
+        
+        <div className="flex items-center justify-between bg-blue-200 p-4 rounded-xl shadow-sm">
+          <span className="text-gray-700 font-semibold text-lg flex items-center gap-2">
+            <FaCalendarAlt className="text-blue-600" size={20} />
+            This Month:
+          </span>
+          <span className="text-blue-700 font-extrabold text-2xl">৳{summary.thisMonth.toLocaleString()}</span>
+        </div>
+      </div>
+    </Card>
       </div>
 
       <div className="flex flex-col md:flex-row justify-between items-center mb-4 space-y-2 md:space-y-0 md:space-x-2">
@@ -181,47 +217,54 @@ export default function AllExpenses() {
         </Button>
       </div>
 
-      <div className="overflow-x-auto">
-        <Table striped>
-          <Table.Head>
-            <Table.HeadCell>Date</Table.HeadCell>
-            <Table.HeadCell>Category</Table.HeadCell>
-            <Table.HeadCell>Amount</Table.HeadCell>
-            <Table.HeadCell>Note</Table.HeadCell>
-            <Table.HeadCell>Actions</Table.HeadCell>
-          </Table.Head>
-          <Table.Body>
-            {filteredExpenses.map((expense) => (
-              <Table.Row key={expense._id}>
-                <Table.Cell>{new Date(expense.expenseDate).toLocaleDateString()}</Table.Cell>
-                <Table.Cell>{expense.expenseCategory}</Table.Cell>
-                <Table.Cell>৳{expense.expenseAmount.toFixed(2)}</Table.Cell>
-                <Table.Cell>{expense.expenseNote}</Table.Cell>
-                <Table.Cell>
-                  <div className="flex space-x-2">
-                    <Button
-                      color="info"
-                      size="sm"
-                      className="rounded-l-lg rounded-r-none"
-                      onClick={() => handleEdit(expense)}
-                    >
-                      <FaEdit />
-                    </Button>
-                    <Button
-                      color="failure"
-                      size="sm"
-                      className="rounded-l-none rounded-r-lg"
-                      onClick={() => handleDelete(expense._id)}
-                    >
-                      <FaTrash />
-                    </Button>
-                  </div>
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table>
-      </div>
+      <div className="overflow-x-auto rounded-2xl shadow-sm border border-gray-300 bg-white">
+      <Table hoverable className="w-full">
+        <Table.Head className="bg-gradient-to-r from-blue-100 to-gray-200">
+          <Table.HeadCell className="text-gray-900 font-bold text-sm py-3">Date</Table.HeadCell>
+          <Table.HeadCell className="text-gray-900 font-bold text-sm py-3">Category</Table.HeadCell>
+          <Table.HeadCell className="text-gray-900 font-bold text-sm py-3">Amount</Table.HeadCell>
+          <Table.HeadCell className="text-gray-900 font-bold text-sm py-3">Note</Table.HeadCell>
+          <Table.HeadCell className="text-gray-900 font-bold text-sm py-3">Actions</Table.HeadCell>
+        </Table.Head>
+        <Table.Body className="divide-y divide-gray-200">
+          {filteredExpenses.map((expense) => (
+            <Table.Row
+              key={expense._id}
+              className="hover:bg-gray-100 transition-all duration-200"
+            >
+              <Table.Cell className="py-3 px-4 text-gray-700">
+                {new Date(expense.expenseDate).toLocaleDateString()}
+              </Table.Cell>
+              <Table.Cell className="py-3 px-4 text-gray-700">{expense.expenseCategory}</Table.Cell>
+              <Table.Cell className="py-3 px-4 font-bold text-red-600">
+                ৳{expense.expenseAmount.toFixed(2)}
+              </Table.Cell>
+              <Table.Cell className="py-3 px-4 text-gray-600">{expense.expenseNote}</Table.Cell>
+              <Table.Cell className="py-3 px-4">
+                <div className="flex space-x-2">
+                  <Button
+                    color="info"
+                    size="sm"
+                    className="rounded-full px-1 shadow-md flex items-center gap-2"
+                    onClick={() => handleEdit(expense)}
+                  >
+                    <FaEdit />
+                  </Button>
+                  <Button
+                    color="failure"
+                    size="sm"
+                    className="rounded-full px-1 shadow-md flex items-center gap-2"
+                    onClick={() => handleDelete(expense._id)}
+                  >
+                    <FaTrash />
+                  </Button>
+                </div>
+              </Table.Cell>
+            </Table.Row>
+          ))}
+        </Table.Body>
+      </Table>
+    </div>
 
       <Modal show={showEditModal} onClose={() => setShowEditModal(false)}>
         <Modal.Header>Edit Expense</Modal.Header>

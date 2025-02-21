@@ -12,15 +12,24 @@ export default function FinancialSummary({ setError }) {
     const fetchData = async () => {
       try {
         setLoading(true)
-        const response = await fetch("http://localhost:4000/api/finance/profit")
-        if (!response.ok) {
+
+        // Fetching each financial data from separate routes
+        const revenueResponse = await fetch("http://localhost:4000/api/summary-report/monthly-revenue")
+        const grossProfitResponse = await fetch("http://localhost:4000/api/summary-report/gross-profit")
+        const netProfitResponse = await fetch("http://localhost:4000/api/summary-report/net-profit")
+
+        if (!revenueResponse.ok || !grossProfitResponse.ok || !netProfitResponse.ok) {
           throw new Error("Failed to fetch financial data")
         }
-        const financeData = await response.json()
+
+        const revenueData = await revenueResponse.json()
+        const grossProfitData = await grossProfitResponse.json()
+        const netProfitData = await netProfitResponse.json()
+
         setData({
-          revenue: financeData.grossProfit + financeData.netProfit,
-          grossProfit: financeData.grossProfit,
-          netProfit: financeData.netProfit,
+          revenue: revenueData.currentMonthRevenue,
+          grossProfit: grossProfitData.grossProfit,
+          netProfit: netProfitData.netProfit,
         })
       } catch (error) {
         console.error("Error fetching financial data:", error)
@@ -79,4 +88,3 @@ export default function FinancialSummary({ setError }) {
     </motion.div>
   )
 }
-

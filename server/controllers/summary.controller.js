@@ -47,6 +47,16 @@ export const getTotalStockValue = async (req, res) => {
     }
 };
 
+export const getStockValue = async (req, res) => {
+    try {
+        const products = await Product.find();
+        const stockValue = products.reduce((acc, product) => acc + (product.availableQuantity * product.sellPrice), 0);
+        res.json({ stockValue });
+    } catch (error) {
+        res.status(500).json({ message: "Error fetching stock value", error });
+    }
+};
+
 export const getTotalDamageValue = async (req, res) => {
     try {
         const { start, end } = getDateRange(req.query.startDate, req.query.endDate);

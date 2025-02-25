@@ -8,7 +8,7 @@ function Layout() {
   return (
     <ThemeProvider>
       <Outlet/>
-      <UpdatesPanel/>
+      {/* <UpdatesPanel/> */}
     </ThemeProvider>
   )
 }

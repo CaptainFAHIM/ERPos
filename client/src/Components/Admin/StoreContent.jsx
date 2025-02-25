@@ -1,8 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Spinner } from "flowbite-react"
-import { FaSave, FaStore, FaPhone, FaEnvelope, FaFileInvoice, FaMapMarkerAlt } from "react-icons/fa"
+import { motion } from "framer-motion"
+import axios from "axios"
+import { FaStore, FaPhone, FaEnvelope, FaFileInvoice, FaMapMarkerAlt, FaSave } from "react-icons/fa"
+import { Button, TextInput, Textarea, Spinner, Toast } from "flowbite-react"
+import { HiX } from "react-icons/hi"
 
 export default function StoreContent() {
   const [storeSettings, setStoreSettings] = useState({
@@ -14,23 +17,27 @@ export default function StoreContent() {
     cashMemoFormats: "",
   })
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [toast, setToast] = useState({ show: false, message: "", type: "" })
 
   useEffect(() => {
     fetchStoreSettings()
   }, [])
 
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type })
+    setTimeout(() => setToast({ show: false, message: "", type: "" }), 3000)
+  }
+
   const fetchStoreSettings = async () => {
     try {
-      const response = await fetch("http://localhost:4000/api/storeSettings")
-      if (response.ok) {
-        const data = await response.json()
-        setStoreSettings(data)
-      } else if (response.status !== 404) {
-        throw new Error("Failed to fetch store settings")
-      }
+      setLoading(true)
+      const response = await axios.get("http://localhost:4000/api/storeSettings")
+      setStoreSettings(response.data)
     } catch (err) {
-      setError(err.message)
+      setError("Failed to fetch store settings")
+      showToast("Failed to fetch store settings", "error")
     } finally {
       setLoading(false)
     }
@@ -42,27 +49,22 @@ export default function StoreContent() {
   }
 
   const handleSaveSettings = async () => {
-    setLoading(true)
+    setSaving(true)
     try {
       const url = "http://localhost:4000/api/storeSettings"
       const method = storeSettings._id ? "PUT" : "POST"
-      const response = await fetch(url, {
+      const response = await axios({
         method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(storeSettings),
+        url,
+        data: storeSettings,
       })
-      if (response.ok) {
-        const result = await response.json()
-        setStoreSettings(result.newSettings || result.updatedSettings)
-        alert("Settings saved successfully!")
-      } else {
-        throw new Error("Failed to save settings")
-      }
+      setStoreSettings(response.data.newSettings || response.data.updatedSettings)
+      showToast("Settings saved successfully!")
     } catch (err) {
-      setError(err.message)
-      alert("Error saving settings. Please try again.")
+      setError("Failed to save settings")
+      showToast("Error saving settings. Please try again.", "error")
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
@@ -74,163 +76,192 @@ export default function StoreContent() {
     )
   }
 
-  if (error) {
-    return (
-      <div className="text-center text-red-500 p-4">
-        <h2 className="text-2xl font-bold mb-2">Error</h2>
-        <p>{error}</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-8">
-      <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-2xl overflow-hidden">
-        <div className="p-8">
-          <h1 className="text-4xl font-extrabold mb-8 text-green-800 flex items-center">
-            <FaStore className="mr-4 text-green-600" /> Store Settings
-          </h1>
-
-          <div className="grid gap-8 mb-8 lg:grid-cols-2">
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold mb-4 text-green-700">General Information</h2>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="storeName" className="block text-sm font-medium text-gray-700 mb-1">
-                    Store Name
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <FaStore className="h-5 w-5 text-green-500" />
-                    </div>
-                    <input
-                      type="text"
-                      name="storeName"
-                      id="storeName"
-                      className="block w-full pl-10 sm:text-sm border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                      placeholder="Enter store name"
-                      value={storeSettings.storeName}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
-                    Address
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 pt-3 flex items-start pointer-events-none">
-                      <FaMapMarkerAlt className="h-5 w-5 text-green-500" />
-                    </div>
-                    <textarea
-                      id="address"
-                      name="address"
-                      rows={3}
-                      className="block w-full pl-10 sm:text-sm border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                      placeholder="Enter store address"
-                      value={storeSettings.address}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="phoneNumbers" className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone Numbers
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <FaPhone className="h-5 w-5 text-green-500" />
-                    </div>
-                    <input
-                      type="text"
-                      name="phoneNumbers"
-                      id="phoneNumbers"
-                      className="block w-full pl-10 sm:text-sm border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                      placeholder="Enter phone numbers (comma-separated)"
-                      value={storeSettings.phoneNumbers}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="emails" className="block text-sm font-medium text-gray-700 mb-1">
-                    Emails
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <FaEnvelope className="h-5 w-5 text-green-500" />
-                    </div>
-                    <input
-                      type="text"
-                      name="emails"
-                      id="emails"
-                      className="block w-full pl-10 sm:text-sm border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                      placeholder="Enter email addresses (comma-separated)"
-                      value={storeSettings.emails}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                </div>
+    <div className="min-h-screen bg-gray-50/50 p-4 sm:p-6 lg:p-8">
+      {/* Header Card */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative mb-6 overflow-hidden"
+      >
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 bg-white rounded-2xl shadow-lg border border-gray-100">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-green-500 opacity-20 rounded-xl blur-lg"></div>
+              <div className="relative bg-gradient-to-br from-green-500 to-emerald-600 w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg">
+                <FaStore className="w-6 h-6" />
               </div>
             </div>
-
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold mb-4 text-green-700">Invoice/Cash Memo Settings</h2>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="invoiceFormats" className="block text-sm font-medium text-gray-700 mb-1">
-                    Invoice Formats
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 pt-3 flex items-start pointer-events-none">
-                      <FaFileInvoice className="h-5 w-5 text-green-500" />
-                    </div>
-                    <textarea
-                      id="invoiceFormats"
-                      name="invoiceFormats"
-                      rows={3}
-                      className="block w-full pl-10 sm:text-sm border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                      placeholder="Enter invoice formats (comma-separated)"
-                      value={storeSettings.invoiceFormats}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="cashMemoFormats" className="block text-sm font-medium text-gray-700 mb-1">
-                    Cash Memo Formats
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 pt-3 flex items-start pointer-events-none">
-                      <FaFileInvoice className="h-5 w-5 text-green-500" />
-                    </div>
-                    <textarea
-                      id="cashMemoFormats"
-                      name="cashMemoFormats"
-                      rows={3}
-                      className="block w-full pl-10 sm:text-sm border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                      placeholder="Enter cash memo formats (comma-separated)"
-                      value={storeSettings.cashMemoFormats}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                </div>
-              </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Store Settings</h1>
+              <p className="text-sm text-gray-500">Manage your store information and settings</p>
             </div>
           </div>
+          <Button
+            onClick={handleSaveSettings}
+            disabled={saving}
+            className="w-full sm:w-auto bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+          >
+            <FaSave className="w-5 h-5 mr-2" />
+            {saving ? "Saving..." : "Save Settings"}
+          </Button>
+        </div>
+      </motion.div>
 
-          <div className="flex justify-end mt-8">
-            <button
-              onClick={handleSaveSettings}
-              disabled={loading}
-              className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold rounded-lg shadow-md hover:from-green-700 hover:to-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75 transition duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105"
-            >
-              <FaSave className="inline-block mr-2" />
-              {loading ? "Saving..." : "Save Settings"}
-            </button>
+      {/* Main Content */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid gap-6 mb-8 md:grid-cols-2">
+        {/* General Information */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+          <h2 className="text-xl font-semibold mb-4 text-gray-800">General Information</h2>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="storeName" className="block text-sm font-medium text-gray-700 mb-1">
+                Store Name
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FaStore className="h-5 w-5 text-gray-400" />
+                </div>
+                <TextInput
+                  id="storeName"
+                  name="storeName"
+                  value={storeSettings.storeName}
+                  onChange={handleInputChange}
+                  className="pl-10"
+                  placeholder="Enter store name"
+                />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
+                Address
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 pt-2 flex items-start pointer-events-none">
+                  <FaMapMarkerAlt className="h-5 w-5 text-gray-400" />
+                </div>
+                <Textarea
+                  id="address"
+                  name="address"
+                  value={storeSettings.address}
+                  onChange={handleInputChange}
+                  className="pl-10"
+                  rows={3}
+                  placeholder="Enter store address"
+                />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="phoneNumbers" className="block text-sm font-medium text-gray-700 mb-1">
+                Phone Numbers
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FaPhone className="h-5 w-5 text-gray-400" />
+                </div>
+                <TextInput
+                  id="phoneNumbers"
+                  name="phoneNumbers"
+                  value={storeSettings.phoneNumbers}
+                  onChange={handleInputChange}
+                  className="pl-10"
+                  placeholder="Enter phone numbers (comma-separated)"
+                />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="emails" className="block text-sm font-medium text-gray-700 mb-1">
+                Emails
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FaEnvelope className="h-5 w-5 text-gray-400" />
+                </div>
+                <TextInput
+                  id="emails"
+                  name="emails"
+                  value={storeSettings.emails}
+                  onChange={handleInputChange}
+                  className="pl-10"
+                  placeholder="Enter email addresses (comma-separated)"
+                />
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+
+        {/* Invoice/Cash Memo Settings */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+          <h2 className="text-xl font-semibold mb-4 text-gray-800">Invoice/Cash Memo Settings</h2>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="invoiceFormats" className="block text-sm font-medium text-gray-700 mb-1">
+                Invoice Formats
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 pt-2 flex items-start pointer-events-none">
+                  <FaFileInvoice className="h-5 w-5 text-gray-400" />
+                </div>
+                <Textarea
+                  id="invoiceFormats"
+                  name="invoiceFormats"
+                  value={storeSettings.invoiceFormats}
+                  onChange={handleInputChange}
+                  className="pl-10"
+                  rows={3}
+                  placeholder="Enter invoice formats (comma-separated)"
+                />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="cashMemoFormats" className="block text-sm font-medium text-gray-700 mb-1">
+                Cash Memo Formats
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 pt-2 flex items-start pointer-events-none">
+                  <FaFileInvoice className="h-5 w-5 text-gray-400" />
+                </div>
+                <Textarea
+                  id="cashMemoFormats"
+                  name="cashMemoFormats"
+                  value={storeSettings.cashMemoFormats}
+                  onChange={handleInputChange}
+                  className="pl-10"
+                  rows={3}
+                  placeholder="Enter cash memo formats (comma-separated)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Toast Notifications */}
+      {toast.show && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <Toast>
+            <div className="flex items-center gap-3">
+              <div
+                className={`
+                p-2 rounded-lg
+                ${toast.type === "error" ? "bg-red-100 text-red-600" : ""}
+                ${toast.type === "success" ? "bg-green-100 text-green-600" : ""}
+                ${toast.type === "warning" ? "bg-yellow-100 text-yellow-600" : ""}
+              `}
+              >
+                <FaStore className="w-5 h-5" />
+              </div>
+              <div className="text-sm font-medium text-gray-900">{toast.message}</div>
+              <button
+                onClick={() => setToast({ show: false, message: "", type: "" })}
+                className="ml-auto text-gray-400 hover:text-gray-500"
+              >
+                <HiX className="w-5 h-5" />
+              </button>
+            </div>
+          </Toast>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,7 @@
-"use client"
-
+import React, { useEffect } from "react"
+import { useDispatch, useSelector } from "react-redux"
+import { useNavigate } from "react-router-dom"
+import { signOut } from "../../Redux/UserSlice/UserSlice"
 import { usePOSContext, POSProvider } from "./context/POSContext"
 import Sidebar from "./Sidebar"
 import PaymentModal from "./PaymentModal"
@@ -13,6 +15,19 @@ import ChangePassword from "./ChangePassword"
 import UpdatesPanel from "../UpdatesPanel/UpdatesPanel"
 
 const POSContent = () => {
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
+
+  // Get the current user from Redux store
+  const currentUser = useSelector((state) => state.user.currentUser)
+
+  // Redirect to login if user is not authenticated or inactive
+  useEffect(() => {
+    if (!currentUser || !currentUser.isActive) {
+      navigate("/login")
+    }
+  }, [currentUser, navigate])
+
   const {
     activeTab,
     isLoading,
@@ -48,9 +63,20 @@ const POSContent = () => {
     }
   }
 
+  const handleLogout = () => {
+    // Remove user data from localStorage
+    localStorage.removeItem("user")
+
+    // Dispatch logout action to clear Redux state
+    dispatch(signOut())
+
+    // Redirect to login page
+    navigate("/login")
+  }
+
   return (
     <div className="flex h-screen bg-gray-100">
-      <Sidebar />
+      <Sidebar handleLogout={handleLogout} />
 
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 overflow-y-auto p-4">
@@ -85,4 +111,3 @@ const POSDashboard = () => {
 }
 
 export default POSDashboard
-

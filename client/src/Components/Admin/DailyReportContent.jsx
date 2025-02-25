@@ -1,55 +1,71 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { Card, Table, Spinner, Badge, Button, TextInput } from "flowbite-react"
+import { useState, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import axios from "axios"
+import { Button, TextInput, Toast } from "flowbite-react"
+import { HiX } from "react-icons/hi"
 import {
-  FaMoneyBillWave,
-  FaShoppingCart,
-  FaPercentage,
-  FaStar,
-  FaCrown,
-  FaChartLine,
-  FaCalendarDay,
-  FaPrint,
-  FaFileExcel,
-  FaSearch,
-  FaCalendarAlt,
-} from "react-icons/fa"
+  FiPackage,
+  FiDollarSign,
+  FiShoppingCart,
+  FiPercent,
+  FiStar,
+  FiSearch,
+  FiCalendar,
+  FiDownload,
+  FiAlertCircle,
+  FiTrendingUp,
+  FiAward,
+} from "react-icons/fi"
 import * as XLSX from "xlsx"
+import jsPDF from "jspdf"
+import "jspdf-autotable"
 
-export default function DailyReportContent() {
+export default function DailyReport() {
   const [sales, setSales] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
+  const [toast, setToast] = useState({ show: false, message: "", type: "" })
   const [filteredSales, setFilteredSales] = useState([])
 
   useEffect(() => {
-    const fetchSales = async () => {
-      try {
-        const response = await fetch("http://localhost:4000/api/sales/")
-        if (!response.ok) throw new Error("Failed to fetch sales data")
-        const data = await response.json()
-        setSales(data)
-        setFilteredSales(data)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
-    }
     fetchSales()
   }, [])
 
-  const handleSearch = useCallback(() => {
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type })
+    setTimeout(() => setToast({ show: false, message: "", type: "" }), 3000)
+  }
+
+  const fetchSales = async () => {
+    try {
+      setLoading(true)
+      const response = await axios.get("http://localhost:4000/api/sales/")
+      setSales(response.data)
+      setFilteredSales(response.data)
+    } catch (error) {
+      console.error("Error fetching sales:", error)
+      showToast("Failed to fetch sales data", "error")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     const filtered = sales.filter((sale) => {
-      const searchFields = [sale.customerName, sale.invoiceNo, sale.transactionNo, sale.finalAmount?.toString()]
+      // Ensure all fields are converted to strings and handle null/undefined values
+      const searchableFields = [
+        String(sale.customerName || ""),
+        String(sale.invoiceNo || ""),
+        String(sale.transactionNo || ""),
+        String(sale.finalAmount || "0"),
+      ]
 
       const matchesSearch =
-        searchTerm === "" ||
-        searchFields.some((field) => field && field.toLowerCase().includes(searchTerm.toLowerCase()))
+        !searchTerm || searchableFields.some((field) => field.toLowerCase().includes(searchTerm.toLowerCase()))
 
       const saleDate = new Date(sale.createdAt)
       const start = startDate ? new Date(startDate) : null
@@ -63,368 +79,466 @@ export default function DailyReportContent() {
     setFilteredSales(filtered)
   }, [searchTerm, startDate, endDate, sales])
 
-  useEffect(() => {
-    const debounceTimer = setTimeout(handleSearch, 300)
-    return () => clearTimeout(debounceTimer)
-  }, [handleSearch])
+  const calculateStats = (sales) => {
+    return sales.reduce(
+      (acc, sale) => {
+        // Calculate total sales, transactions, discounts
+        acc.totalSales += sale.finalAmount || 0
+        acc.totalTransactions++
+        acc.totalDiscounts += sale.discount || 0
 
-  const { totalSales, totalTransactions, totalDiscounts, trendingProducts, customerSales } = filteredSales.reduce(
-    (acc, sale) => {
-      acc.totalSales += sale.finalAmount || 0
-      acc.totalTransactions++
-      acc.totalDiscounts += sale.discount || 0
-
-      sale.products?.forEach((item) => {
-        const { _id, barcode, description } = item.productId
-        if (!acc.trendingProducts[_id]) {
-          acc.trendingProducts[_id] = { barcode, description, quantity: 0, totalSales: 0 }
+        // Calculate customer sales
+        if (sale.customerName) {
+          if (!acc.customerSales[sale.customerName]) {
+            acc.customerSales[sale.customerName] = { total: 0, count: 0 }
+          }
+          acc.customerSales[sale.customerName].total += sale.finalAmount || 0
+          acc.customerSales[sale.customerName].count++
         }
-        acc.trendingProducts[_id].quantity += item.quantity
-        acc.trendingProducts[_id].totalSales += item.totalPrice || 0
-      })
 
-      if (sale.customerName) {
-        if (!acc.customerSales[sale.customerName]) {
-          acc.customerSales[sale.customerName] = { totalAmount: 0, transactions: 0 }
+        // Calculate product sales
+        if (sale.products && Array.isArray(sale.products)) {
+          sale.products.forEach((product) => {
+            const productId = product.productId._id
+            if (!acc.productSales[productId]) {
+              acc.productSales[productId] = {
+                name: product.productId.description,
+                quantity: 0,
+                total: 0,
+                barcode: product.productId.barcode,
+              }
+            }
+            acc.productSales[productId].quantity += product.quantity || 0
+            acc.productSales[productId].total += product.totalPrice || 0
+          })
         }
-        acc.customerSales[sale.customerName].totalAmount += sale.finalAmount || 0
-        acc.customerSales[sale.customerName].transactions++
-      }
 
-      return acc
-    },
-    {
-      totalSales: 0,
-      totalTransactions: 0,
-      totalDiscounts: 0,
-      trendingProducts: {},
-      customerSales: {},
-    },
-  )
-
-  const topProducts = Object.values(trendingProducts)
-    .sort((a, b) => b.totalSales - a.totalSales)
-    .slice(0, 5)
-
-  const bestSellingProduct = topProducts[0] || null
-
-  const bestCustomer = Object.entries(customerSales).sort((a, b) => b[1].totalAmount - a[1].totalAmount)[0] || null
-
-  const handlePrint = useCallback(() => {
-    const printContent = document.getElementById("printableContent")?.outerHTML
-    const printWindow = window.open("", "_blank")
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Daily Sales Report</title>
-            <style>
-              body { 
-                font-family: Arial, sans-serif; 
-                margin: 20px; 
-                padding: 0; 
-                color: #1f2937;
-              }
-              table { 
-                border-collapse: collapse; 
-                width: 100%; 
-                margin-bottom: 2rem;
-              }
-              th, td { 
-                padding: 12px; 
-                text-align: left; 
-                border: 1px solid #e5e7eb; 
-              }
-              th { 
-                background-color: #f9fafb; 
-                font-weight: 600;
-              }
-              .badge {
-                background-color: #e5e7eb;
-                padding: 4px 8px;
-                border-radius: 9999px;
-                font-size: 0.875rem;
-              }
-              .card {
-                border: 1px solid #e5e7eb;
-                padding: 1rem;
-                margin-bottom: 1rem;
-                border-radius: 0.5rem;
-              }
-              h1, h2 { 
-                color: #1f2937;
-                margin-bottom: 1rem;
-              }
-              @media print {
-                .no-print { display: none; }
-              }
-            </style>
-          </head>
-          <body>
-            ${printContent}
-          </body>
-        </html>
-      `)
-      printWindow.document.close()
-      printWindow.print()
-      printWindow.onafterprint = () => {
-        window.location.reload()
-      }
-    }
-  }, [])
-
-  const handleExcelExport = useCallback(() => {
-    const exportData = filteredSales.map((sale) => ({
-      Date: new Date(sale.createdAt).toLocaleDateString(),
-      "Invoice No": sale.invoiceNo || "N/A",
-      "Transaction No": sale.transactionNo || "N/A",
-      Customer: sale.customerName || "Walk-in",
-      Amount: sale.finalAmount || 0,
-      "Payment Method": sale.paymentMethod || "N/A",
-    }))
-
-    const worksheet = XLSX.utils.json_to_sheet(exportData)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, "DailySales")
-    XLSX.writeFile(workbook, `daily_sales_${new Date().toISOString().split("T")[0]}.xlsx`)
-  }, [filteredSales])
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <Spinner size="xl" />
-      </div>
+        return acc
+      },
+      {
+        totalSales: 0,
+        totalTransactions: 0,
+        totalDiscounts: 0,
+        customerSales: {},
+        productSales: {},
+      },
     )
   }
 
-  if (error) {
-    return <p className="text-red-500 text-center text-xl p-4">{error}</p>
+  const stats = calculateStats(filteredSales)
+  const bestCustomer = Object.entries(stats.customerSales).sort(([, a], [, b]) => b.total - a.total)[0]
+
+  const topProducts = Object.values(stats.productSales)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5)
+
+  const handleExportExcel = () => {
+    // Prepare summary data
+    const summaryData = [
+      ["Summary"],
+      ["Total Sales", `৳${stats.totalSales.toLocaleString()}`],
+      ["Total Transactions", stats.totalTransactions],
+      ["Total Discounts", `৳${stats.totalDiscounts.toLocaleString()}`],
+      [""],
+      ["Top Products"],
+      ["Product", "Quantity", "Total Sales"],
+      ...topProducts.map((product) => [product.name, product.quantity, `৳${product.total.toLocaleString()}`]),
+      [""],
+      ["Transactions"],
+    ]
+
+    // Prepare transaction data
+    const transactionData = filteredSales.map((sale) => ({
+      Date: new Date(sale.createdAt).toLocaleDateString(),
+      Invoice: sale.invoiceNo || "N/A",
+      Customer: sale.customerName || "Walk-in",
+      Amount: `৳${(sale.finalAmount || 0).toLocaleString()}`,
+      Payment: sale.paymentMethod || "N/A",
+    }))
+
+    // Create workbook with multiple sheets
+    const wb = XLSX.utils.book_new()
+
+    // Add summary sheet
+    const ws1 = XLSX.utils.aoa_to_sheet(summaryData)
+    XLSX.utils.book_append_sheet(wb, ws1, "Summary")
+
+    // Add transactions sheet
+    const ws2 = XLSX.utils.json_to_sheet(transactionData)
+    XLSX.utils.book_append_sheet(wb, ws2, "Transactions")
+
+    // Save the file
+    XLSX.writeFile(wb, `sales_report_${new Date().toISOString().split("T")[0]}.xlsx`)
+    showToast("Excel file exported successfully")
+  }
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF()
+
+    // Add title
+    doc.setFontSize(20)
+    doc.text("Daily Sales Report", 14, 22)
+
+    // Add date range
+    doc.setFontSize(11)
+    const dateText =
+      startDate && endDate
+        ? `Period: ${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`
+        : `Date: ${new Date().toLocaleDateString()}`
+    doc.text(dateText, 14, 32)
+
+    // Add summary statistics
+    doc.setFontSize(14)
+    doc.text("Summary", 14, 45)
+
+    const summaryData = [
+      ["Total Sales", `৳${stats.totalSales.toLocaleString()}`],
+      ["Total Transactions", stats.totalTransactions.toString()],
+      ["Total Discounts", `৳${stats.totalDiscounts.toLocaleString()}`],
+      ["Best Customer", bestCustomer ? `${bestCustomer[0]} (৳${bestCustomer[1].total.toLocaleString()})` : "N/A"],
+    ]
+
+    doc.autoTable({
+      startY: 50,
+      head: [["Metric", "Value"]],
+      body: summaryData,
+      theme: "grid",
+      headStyles: { fillColor: [66, 139, 202] },
+    })
+
+    // Add top products
+    doc.text("Top Products", 14, doc.previousAutoTable.finalY + 15)
+
+    const productData = topProducts.map((product) => [
+      product.name,
+      product.quantity.toString(),
+      `৳${product.total.toLocaleString()}`,
+    ])
+
+    doc.autoTable({
+      startY: doc.previousAutoTable.finalY + 20,
+      head: [["Product", "Quantity", "Total Sales"]],
+      body: productData,
+      theme: "grid",
+      headStyles: { fillColor: [66, 139, 202] },
+    })
+
+    // Add transactions
+    doc.text("Transactions", 14, doc.previousAutoTable.finalY + 15)
+
+    const transactionData = filteredSales.map((sale) => [
+      sale.invoiceNo || "N/A",
+      sale.customerName || "Walk-in",
+      `৳${(sale.finalAmount || 0).toLocaleString()}`,
+      sale.paymentMethod || "N/A",
+      new Date(sale.createdAt).toLocaleDateString(),
+    ])
+
+    doc.autoTable({
+      startY: doc.previousAutoTable.finalY + 20,
+      head: [["Invoice", "Customer", "Amount", "Payment", "Date"]],
+      body: transactionData,
+      theme: "grid",
+      headStyles: { fillColor: [66, 139, 202] },
+    })
+
+    // Save the PDF
+    doc.save(`daily_sales_report_${new Date().toISOString().split("T")[0]}.pdf`)
+    showToast("PDF exported successfully")
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6" id="printableContent">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-xl">
-        <div className="flex items-center gap-3">
-          <FaChartLine className="text-3xl text-blue-600" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Daily Sales Report</h1>
-            <p className="text-sm text-gray-600">Overview of daily sales and transactions</p>
+    <div className="min-h-screen bg-gray-50/50 p-4 sm:p-6 lg:p-8">
+      {/* Header Card */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative mb-6 overflow-hidden"
+      >
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 bg-white rounded-2xl shadow-lg border border-gray-100">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-blue-500 opacity-20 rounded-xl blur-lg"></div>
+              <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg">
+                <FiPackage className="w-6 h-6" />
+              </div>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Daily Sales Report</h1>
+              <p className="text-sm text-gray-500">Overview of your daily sales performance</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleExportExcel}
+              className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-0"
+            >
+              <FiDownload className="w-4 h-4 mr-2" />
+              Export Excel
+            </Button>
+            <Button
+              onClick={handleExportPDF}
+              className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white border-0"
+            >
+              <FiDownload className="w-4 h-4 mr-2" />
+              Export PDF
+            </Button>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button gradientDuoTone="purpleToBlue" onClick={handlePrint}>
-            <FaPrint className="mr-2" /> Print
-          </Button>
-          <Button gradientDuoTone="greenToBlue" onClick={handleExcelExport}>
-            <FaFileExcel className="mr-2" /> Export
-          </Button>
-        </div>
-      </div>
+      </motion.div>
 
-      {/* Filters Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white p-4 rounded-lg shadow-sm">
+      {/* Filters */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6"
+      >
         <div className="relative">
+          <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
           <TextInput
             type="text"
             placeholder="Search transactions..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            icon={FaSearch}
-            className="w-full"
+            className="pl-10"
           />
         </div>
         <div className="relative">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-            <FaCalendarAlt size={14} />
-          </div>
-          <TextInput
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="w-full pl-10"
-          />
+          <FiCalendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <TextInput type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="pl-10" />
         </div>
         <div className="relative">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-            <FaCalendarAlt size={14} />
-          </div>
-          <TextInput
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="w-full pl-10"
-          />
+          <FiCalendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <TextInput type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="pl-10" />
         </div>
-      </div>
+      </motion.div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-none">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <FaMoneyBillWave className="text-2xl text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Sales</p>
-              <p className="text-2xl font-bold text-gray-800">
-                ৳{totalSales.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-none">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <FaShoppingCart className="text-2xl text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Transactions</p>
-              <p className="text-2xl font-bold text-gray-800">{totalTransactions}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-red-50 to-orange-50 border-none">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-red-100 rounded-lg">
-              <FaPercentage className="text-2xl text-red-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Discounts</p>
-              <p className="text-2xl font-bold text-gray-800">
-                ৳{totalDiscounts.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        {bestSellingProduct && (
-          <Card className="bg-gradient-to-br from-yellow-50 to-amber-50 border-none">
+      {/* Stats Grid */}
+      <div className="grid gap-6 mb-6">
+        {/* Summary Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        >
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-yellow-100 rounded-lg">
-                <FaStar className="text-2xl text-yellow-600" />
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <FiDollarSign className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Best Seller</p>
-                <p className="text-2xl font-bold text-gray-800">
-                  ৳{bestSellingProduct.totalSales.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-                </p>
-                <p className="text-xs text-gray-500 truncate">{bestSellingProduct.description}</p>
+                <p className="text-sm text-gray-600">Total Sales</p>
+                <p className="text-2xl font-bold text-gray-900">৳{stats.totalSales.toLocaleString()}</p>
               </div>
             </div>
-          </Card>
-        )}
-      </div>
-
-      {/* Trending Products and Best Customer */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2">
-          <h2 className="text-xl font-semibold mb-4 flex items-center">
-            <FaChartLine className="mr-2 text-blue-600" /> Trending Products
-          </h2>
-          <div className="overflow-x-auto">
-            <Table>
-              <Table.Head>
-                <Table.HeadCell className="bg-gray-50">Product</Table.HeadCell>
-                <Table.HeadCell className="bg-gray-50">Barcode</Table.HeadCell>
-                <Table.HeadCell className="bg-gray-50">Quantity Sold</Table.HeadCell>
-                <Table.HeadCell className="bg-gray-50">Total Sales</Table.HeadCell>
-              </Table.Head>
-              <Table.Body className="divide-y">
-                {topProducts.map((product, index) => (
-                  <Table.Row key={index} className="bg-white">
-                    <Table.Cell className="font-medium">{product.description}</Table.Cell>
-                    <Table.Cell>{product.barcode}</Table.Cell>
-                    <Table.Cell>
-                      <Badge color="info" className="font-medium">
-                        {product.quantity}
-                      </Badge>
-                    </Table.Cell>
-                    <Table.Cell>৳{product.totalSales.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</Table.Cell>
-                  </Table.Row>
-                ))}
-              </Table.Body>
-            </Table>
           </div>
-        </Card>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-none">
-          <h2 className="text-xl font-semibold mb-4 flex items-center">
-            <FaCrown className="mr-2 text-yellow-500" /> Best Customer
-          </h2>
-          {bestCustomer ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-yellow-100 rounded-full">
-                  <FaCrown className="text-xl text-yellow-600" />
-                </div>
-                <div>
-                  <p className="text-lg font-semibold text-gray-800">{bestCustomer[0]}</p>
-                  <p className="text-sm text-gray-500">{bestCustomer[1].transactions} transactions</p>
-                </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-emerald-100 rounded-lg">
+                <FiShoppingCart className="w-6 h-6 text-emerald-600" />
               </div>
-              <div className="pt-4 border-t border-gray-100">
-                <p className="text-sm text-gray-600">Total Spent</p>
-                <p className="text-2xl font-bold text-gray-800">
-                  ৳{bestCustomer[1].totalAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-                </p>
+              <div>
+                <p className="text-sm text-gray-600">Transactions</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalTransactions}</p>
               </div>
             </div>
-          ) : (
-            <p className="text-gray-500">No customer data available</p>
-          )}
-        </Card>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-red-100 rounded-lg">
+                <FiPercent className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Total Discounts</p>
+                <p className="text-2xl font-bold text-gray-900">৳{stats.totalDiscounts.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-amber-100 rounded-lg">
+                <FiStar className="w-6 h-6 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Best Customer</p>
+                {bestCustomer ? (
+                  <>
+                    <p className="text-lg font-bold text-gray-900 truncate">{bestCustomer[0]}</p>
+                    <p className="text-sm text-gray-500">৳{bestCustomer[1].total.toLocaleString()}</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500">No data available</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Top Products */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+        >
+          <div className="p-6 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <FiTrendingUp className="text-blue-600" />
+              Top Selling Products
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Product</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Barcode</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Quantity Sold</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Total Sales</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {topProducts.map((product, index) => (
+                  <tr key={index} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        {index === 0 && (
+                          <div className="p-1.5 bg-amber-100 rounded-full">
+                            <FiAward className="w-4 h-4 text-amber-600" />
+                          </div>
+                        )}
+                        <span className="text-sm font-medium text-gray-900">{product.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{product.barcode}</td>
+                    <td className="px-6 py-4">
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
+                        {product.quantity}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">৳{product.total.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
       </div>
 
       {/* Transactions Table */}
-      <Card>
-        <h2 className="text-xl font-semibold mb-4 flex items-center">
-          <FaCalendarDay className="mr-2 text-indigo-600" /> Sales Transactions
-        </h2>
-        <div className="overflow-x-auto">
-          <Table hoverable>
-            <Table.Head>
-              <Table.HeadCell className="bg-gray-50">Invoice No</Table.HeadCell>
-              <Table.HeadCell className="bg-gray-50">Transaction No</Table.HeadCell>
-              <Table.HeadCell className="bg-gray-50">Customer</Table.HeadCell>
-              <Table.HeadCell className="bg-gray-50">Amount</Table.HeadCell>
-              <Table.HeadCell className="bg-gray-50">Payment Method</Table.HeadCell>
-              <Table.HeadCell className="bg-gray-50">Date</Table.HeadCell>
-            </Table.Head>
-            <Table.Body className="divide-y">
-              {filteredSales.map((sale) => (
-                <Table.Row key={sale._id} className="bg-white hover:bg-gray-50 transition-colors">
-                  <Table.Cell className="font-medium">{sale.invoiceNo || "N/A"}</Table.Cell>
-                  <Table.Cell>{sale.transactionNo || "N/A"}</Table.Cell>
-                  <Table.Cell>{sale.customerName || "Walk-in"}</Table.Cell>
-                  <Table.Cell className="font-medium text-gray-900">
-                    ৳{sale.finalAmount?.toLocaleString("en-IN", { maximumFractionDigits: 2 }) ?? "0.00"}
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Badge
-                      color={sale.paymentMethod === "cash" ? "success" : "info"}
-                      className="font-medium capitalize"
-                    >
-                      {sale.paymentMethod || "N/A"}
-                    </Badge>
-                  </Table.Cell>
-                  <Table.Cell className="text-gray-600">
-                    {sale.createdAt
-                      ? new Date(sale.createdAt).toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })
-                      : "N/A"}
-                  </Table.Cell>
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </Table>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+      >
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-900">Recent Transactions</h2>
         </div>
-      </Card>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Invoice</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Customer</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Amount</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Payment</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Date</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              <AnimatePresence>
+                {loading
+                  ? [...Array(5)].map((_, index) => (
+                      <motion.tr
+                        key={`skeleton-${index}`}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="animate-pulse"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="h-4 w-24 bg-gray-200 rounded"></div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="h-4 w-32 bg-gray-200 rounded"></div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="h-4 w-20 bg-gray-200 rounded"></div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="h-4 w-16 bg-gray-200 rounded"></div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="h-4 w-24 bg-gray-200 rounded"></div>
+                        </td>
+                      </motion.tr>
+                    ))
+                  : filteredSales.map((sale) => (
+                      <motion.tr
+                        key={sale._id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="hover:bg-gray-50/50 transition-colors"
+                      >
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{sale.invoiceNo}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{sale.customerName || "Walk-in"}</td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          ৳{sale.finalAmount?.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`
+                          px-2 py-1 text-xs font-medium rounded-full
+                          ${
+                            sale.paymentMethod === "cash"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-blue-100 text-blue-700"
+                          }
+                        `}
+                          >
+                            {sale.paymentMethod || "N/A"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {new Date(sale.createdAt).toLocaleDateString()}
+                        </td>
+                      </motion.tr>
+                    ))}
+              </AnimatePresence>
+            </tbody>
+          </table>
+        </div>
+      </motion.div>
+
+      {/* Toast Notifications */}
+      {toast.show && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <Toast>
+            <div className="flex items-center gap-3">
+              <div
+                className={`
+                p-2 rounded-lg
+                ${toast.type === "error" ? "bg-red-100 text-red-600" : ""}
+                ${toast.type === "success" ? "bg-green-100 text-green-600" : ""}
+                ${toast.type === "warning" ? "bg-yellow-100 text-yellow-600" : ""}
+              `}
+              >
+                <FiAlertCircle className="w-5 h-5" />
+              </div>
+              <div className="text-sm font-medium text-gray-900">{toast.message}</div>
+              <button
+                onClick={() => setToast({ show: false, message: "", type: "" })}
+                className="ml-auto text-gray-400 hover:text-gray-500"
+              >
+                <HiX className="w-5 h-5" />
+              </button>
+            </div>
+          </Toast>
+        </div>
+      )}
     </div>
   )
 }

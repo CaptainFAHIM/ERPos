@@ -1,6 +1,7 @@
 import { MdDashboard, MdSell } from "react-icons/md"
 import { FaBox, FaLayerGroup, FaBoxOpen, FaChartLine, FaUserCog, FaTruck, FaMoneyBillWave } from "react-icons/fa"
 import { PiNotebookFill } from "react-icons/pi"
+import { TbUserStar } from "react-icons/tb";
 
 import DashboardContent from "./DashboardContent"
 import ProductListContent from "./ProductListContent"
@@ -27,6 +28,7 @@ import AllPaymentsContent from "./AllPaymentsContent"
 import BarcodeGenerator from "./BarcodeGenaratro"
 import POSDetails from "./SoftwareVersion"
 import SoftwareVersion from "./SoftwareVersion"
+import Owner from "./Owner"
 
 export const sections = {
   Dashboard: {
@@ -88,6 +90,10 @@ export const sections = {
       "Supplier Ledger": <SupplierLedgerContent />,
       "Low Stock Report": <LowStockReportContent />,
     },
+  },
+  Owner: {
+    icon: <TbUserStar />,
+    component: <Owner />,
   },
   Setting: {
     icon: <FaUserCog />,

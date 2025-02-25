@@ -1,87 +1,83 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { Table, Button, TextInput, Spinner, Card } from "flowbite-react"
+import { useState, useEffect, useCallback } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import axios from "axios"
+import { Button, TextInput, Toast } from "flowbite-react"
+import { HiX } from "react-icons/hi"
 import {
-  FaSearch,
-  FaPrint,
-  FaFileExcel,
-  FaSyncAlt,
-  FaUsers,
-  FaChartLine,
-  FaCheckCircle,
-  FaCalendarAlt,
-  FaDollarSign,
-  FaArrowUp,
-  FaArrowDown,
-  FaShoppingCart,
-} from "react-icons/fa"
+  FiDollarSign,
+  FiUsers,
+  FiPercent,
+  FiSearch,
+  FiCalendar,
+  FiDownload,
+  FiAlertCircle,
+  FiShoppingCart,
+  FiArrowUp,
+  FiArrowDown,
+  FiCheckCircle,
+} from "react-icons/fi"
 import * as XLSX from "xlsx"
+import jsPDF from "jspdf"
+import "jspdf-autotable"
 
-export default function CustomerLedgerContent() {
+export default function CustomerLedger() {
   const [transactions, setTransactions] = useState([])
   const [filteredTransactions, setFilteredTransactions] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
+  const [toast, setToast] = useState({ show: false, message: "", type: "" })
   const [sortConfig, setSortConfig] = useState({ key: "createdAt", direction: "desc" })
 
-  // Calculate summary statistics
-  const summary = useMemo(() => {
-    return filteredTransactions.reduce(
-      (acc, transaction) => {
-        const amount = Number(transaction.finalAmount || 0)
-        return {
-          totalAmount: acc.totalAmount + amount,
-          averageTransaction: acc.totalAmount / filteredTransactions.length,
-          transactionCount: acc.transactionCount + 1,
-          highestTransaction: Math.max(acc.highestTransaction, amount),
-          lowestTransaction: Math.min(acc.lowestTransaction, amount || Number.POSITIVE_INFINITY),
-          uniqueCustomers: new Set([...acc.uniqueCustomers, transaction.customerName]),
-        }
-      },
-      {
-        totalAmount: 0,
-        averageTransaction: 0,
-        transactionCount: 0,
-        highestTransaction: 0,
-        lowestTransaction: Number.POSITIVE_INFINITY,
-        uniqueCustomers: new Set(),
-      },
-    )
-  }, [filteredTransactions])
+  const safeString = useCallback((value) => {
+    if (value === null || value === undefined) return ""
+    return String(value)
+  }, [])
+
+  const safeNumber = useCallback((value) => {
+    if (value === null || value === undefined) return 0
+    const num = Number(value)
+    return isNaN(num) ? 0 : num
+  }, [])
+
+  const showToast = useCallback((message, type = "success") => {
+    setToast({ show: true, message, type })
+    setTimeout(() => setToast({ show: false, message: "", type: "" }), 3000)
+  }, [])
 
   const fetchTransactions = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
     try {
-      const response = await fetch("http://localhost:4000/api/sales/")
-      if (!response.ok) throw new Error("Failed to fetch data")
-      const data = await response.json()
-      setTransactions(data)
-      setFilteredTransactions(data)
+      setLoading(true)
+      const response = await axios.get("http://localhost:4000/api/sales/")
+      setTransactions(response.data)
+      setFilteredTransactions(response.data)
     } catch (error) {
-      setError("Failed to fetch customer transactions. Please try again later.")
-      console.error("Error fetching sales data:", error)
+      console.error("Error fetching transactions:", error)
+      showToast("Failed to fetch transaction data", "error")
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
-  }, [])
+  }, [showToast])
 
   useEffect(() => {
     fetchTransactions()
   }, [fetchTransactions])
 
-  const handleSearch = useCallback(() => {
+  useEffect(() => {
     const filtered = transactions.filter((transaction) => {
-      const matchesSearch =
-        searchTerm === "" ||
-        transaction.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        transaction.finalAmount.toString().includes(searchTerm)
+      const searchableFields = [
+        safeString(transaction.customerName),
+        safeString(transaction.finalAmount),
+        safeString(transaction.invoiceNo),
+      ]
 
-      const transactionDate = new Date(transaction.createdAt)
+      const matchesSearch =
+        !searchTerm || searchableFields.some((field) => field.toLowerCase().includes(searchTerm.toLowerCase()))
+
+      const transactionDate = new Date(transaction.createdAt || new Date())
       const start = startDate ? new Date(startDate) : null
       const end = endDate ? new Date(endDate) : null
 
@@ -90,13 +86,46 @@ export default function CustomerLedgerContent() {
       return matchesSearch && matchesDateRange
     })
 
-    setFilteredTransactions(filtered)
-  }, [searchTerm, startDate, endDate, transactions])
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortConfig.key === "createdAt") {
+        return sortConfig.direction === "asc"
+          ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      }
+      if (sortConfig.key === "finalAmount") {
+        return sortConfig.direction === "asc"
+          ? safeNumber(a.finalAmount) - safeNumber(b.finalAmount)
+          : safeNumber(b.finalAmount) - safeNumber(a.finalAmount)
+      }
+      return 0
+    })
 
-  useEffect(() => {
-    const debounceTimer = setTimeout(handleSearch, 300)
-    return () => clearTimeout(debounceTimer)
-  }, [handleSearch])
+    setFilteredTransactions(sorted)
+  }, [searchTerm, startDate, endDate, transactions, sortConfig, safeString, safeNumber])
+
+  const stats = filteredTransactions.reduce(
+    (acc, transaction) => {
+      const amount = safeNumber(transaction.finalAmount)
+      const customerName = safeString(transaction.customerName)
+
+      acc.totalAmount += amount
+      acc.transactionCount++
+      acc.averageTransaction = acc.totalAmount / acc.transactionCount
+      acc.highestTransaction = Math.max(acc.highestTransaction, amount)
+      acc.lowestTransaction = amount > 0 ? Math.min(acc.lowestTransaction, amount) : acc.lowestTransaction
+      if (customerName) acc.uniqueCustomers.add(customerName)
+
+      return acc
+    },
+    {
+      totalAmount: 0,
+      transactionCount: 0,
+      averageTransaction: 0,
+      highestTransaction: 0,
+      lowestTransaction: Number.POSITIVE_INFINITY,
+      uniqueCustomers: new Set(),
+    },
+  )
 
   const handleSort = (key) => {
     setSortConfig((prevConfig) => ({
@@ -105,288 +134,331 @@ export default function CustomerLedgerContent() {
     }))
   }
 
-  const sortedTransactions = useMemo(() => {
-    return [...filteredTransactions].sort((a, b) => {
-      if (sortConfig.key === "createdAt") {
-        return sortConfig.direction === "asc"
-          ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-          : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      }
-      if (sortConfig.key === "finalAmount") {
-        return sortConfig.direction === "asc"
-          ? (a.finalAmount || 0) - (b.finalAmount || 0)
-          : (b.finalAmount || 0) - (a.finalAmount || 0)
-      }
-      return 0
-    })
-  }, [filteredTransactions, sortConfig])
+  const handleExportExcel = () => {
+    const summaryData = [
+      ["Summary"],
+      ["Total Amount", `৳${stats.totalAmount.toLocaleString()}`],
+      ["Transaction Count", stats.transactionCount],
+      ["Unique Customers", stats.uniqueCustomers.size],
+      ["Average Transaction", `৳${stats.averageTransaction.toLocaleString()}`],
+      [""],
+      ["Transactions"],
+    ]
 
-  const handlePrint = useCallback(() => {
-    const printContent = document.getElementById("printableTable")?.outerHTML
-    const summaryContent = document.getElementById("summaryStats")?.outerHTML
-
-    const printWindow = window.open("", "_blank")
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Customer Ledger</title>
-            <style>
-              body { 
-                font-family: Arial, sans-serif; 
-                margin: 20px; 
-                padding: 0; 
-                color: #1f2937;
-              }
-              table { 
-                border-collapse: collapse; 
-                width: 100%; 
-                margin-bottom: 2rem;
-              }
-              th, td { 
-                padding: 12px; 
-                text-align: left; 
-                border: 1px solid #e5e7eb; 
-              }
-              th { 
-                background-color: #f9fafb; 
-                font-weight: 600;
-              }
-              .status { 
-                background-color: #10b981; 
-                color: white; 
-                padding: 4px 8px; 
-                border-radius: 4px;
-              }
-              @media print {
-                .no-print { display: none; }
-              }
-            </style>
-          </head>
-          <body>
-            <h1>Customer Ledger</h1>
-            ${summaryContent}
-            ${printContent}
-          </body>
-        </html>
-      `)
-      printWindow.document.close()
-      printWindow.print()
-    }
-  }, [])
-
-  const handleExcelExport = useCallback(() => {
-    const exportData = sortedTransactions.map((t) => ({
+    const transactionData = filteredTransactions.map((t) => ({
       Date: new Date(t.createdAt).toLocaleDateString(),
-      Customer: t.customerName,
-      Amount: t.finalAmount,
+      Customer: t.customerName || "N/A",
+      Amount: `৳${(t.finalAmount || 0).toLocaleString()}`,
       Status: "Paid",
     }))
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, "CustomerLedger")
-    XLSX.writeFile(workbook, `customer_ledger_${new Date().toISOString().split("T")[0]}.xlsx`)
-  }, [sortedTransactions])
+    const wb = XLSX.utils.book_new()
 
-  if (error) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="text-center">
-          <p className="text-red-500 mb-4">{error}</p>
-          <Button color="failure" onClick={fetchTransactions}>
-            <FaSyncAlt className="mr-2" /> Retry
-          </Button>
-        </div>
-      </div>
-    )
+    const ws1 = XLSX.utils.aoa_to_sheet(summaryData)
+    XLSX.utils.book_append_sheet(wb, ws1, "Summary")
+
+    const ws2 = XLSX.utils.json_to_sheet(transactionData)
+    XLSX.utils.book_append_sheet(wb, ws2, "Transactions")
+
+    XLSX.writeFile(wb, `customer_ledger_${new Date().toISOString().split("T")[0]}.xlsx`)
+    showToast("Excel file exported successfully")
+  }
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF()
+
+    // Add title
+    doc.setFontSize(20)
+    doc.text("Customer Ledger Report", 14, 22)
+
+    // Add date range
+    doc.setFontSize(11)
+    const dateText =
+      startDate && endDate
+        ? `Period: ${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`
+        : `Date: ${new Date().toLocaleDateString()}`
+    doc.text(dateText, 14, 32)
+
+    // Add summary statistics
+    doc.setFontSize(14)
+    doc.text("Summary", 14, 45)
+
+    const summaryData = [
+      ["Total Amount", `৳${stats.totalAmount.toLocaleString()}`],
+      ["Transaction Count", stats.transactionCount.toString()],
+      ["Unique Customers", stats.uniqueCustomers.size.toString()],
+      ["Average Transaction", `৳${stats.averageTransaction.toLocaleString()}`],
+    ]
+
+    doc.autoTable({
+      startY: 50,
+      head: [["Metric", "Value"]],
+      body: summaryData,
+      theme: "grid",
+      headStyles: { fillColor: [66, 139, 202] },
+    })
+
+    // Add transactions
+    doc.text("Transactions", 14, doc.previousAutoTable.finalY + 15)
+
+    const transactionData = filteredTransactions.map((t) => [
+      new Date(t.createdAt).toLocaleDateString(),
+      t.customerName || "N/A",
+      `৳${(t.finalAmount || 0).toLocaleString()}`,
+      "Paid",
+    ])
+
+    doc.autoTable({
+      startY: doc.previousAutoTable.finalY + 20,
+      head: [["Date", "Customer", "Amount", "Status"]],
+      body: transactionData,
+      theme: "grid",
+      headStyles: { fillColor: [66, 139, 202] },
+    })
+
+    // Save the PDF
+    doc.save(`customer_ledger_${new Date().toISOString().split("T")[0]}.pdf`)
+    showToast("PDF exported successfully")
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-xl">
-        <div className="flex items-center gap-3">
-          <FaUsers className="text-3xl text-blue-600" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Customer Ledger</h1>
-            <p className="text-sm text-gray-600">Track customer transactions and payments</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button gradientDuoTone="purpleToBlue" onClick={handlePrint}>
-            <FaPrint className="mr-2" /> Print
-          </Button>
-          <Button gradientDuoTone="greenToBlue" onClick={handleExcelExport}>
-            <FaFileExcel className="mr-2" /> Export
-          </Button>
-        </div>
-      </div>
-
-      {/* Summary Statistics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="summaryStats">
-        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-none">
+    <div className="min-h-screen bg-gray-50/50 p-4 sm:p-6 lg:p-8">
+      {/* Header Card */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative mb-6 overflow-hidden"
+      >
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 bg-white rounded-2xl shadow-lg border border-gray-100">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <FaDollarSign className="text-2xl text-blue-600" />
+            <div className="relative">
+              <div className="absolute inset-0 bg-blue-500 opacity-20 rounded-xl blur-lg"></div>
+              <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg">
+                <FiUsers className="w-6 h-6" />
+              </div>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Total Sales</p>
-              <p className="text-2xl font-bold text-gray-800">
-                ৳{summary.totalAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-              </p>
+              <h1 className="text-2xl font-bold text-gray-900">Customer Ledger</h1>
+              <p className="text-sm text-gray-500">Track customer transactions and payments</p>
             </div>
           </div>
-        </Card>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleExportExcel}
+              className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-0"
+            >
+              <FiDownload className="w-4 h-4 mr-2" />
+              Export Excel
+            </Button>
+            <Button
+              onClick={handleExportPDF}
+              className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white border-0"
+            >
+              <FiDownload className="w-4 h-4 mr-2" />
+              Export PDF
+            </Button>
+          </div>
+        </div>
+      </motion.div>
 
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-none">
+      {/* Filters */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6"
+      >
+        <div className="relative">
+          <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <TextInput
+            type="text"
+            placeholder="Search transactions..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="relative">
+          <FiCalendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <TextInput type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="pl-10" />
+        </div>
+        <div className="relative">
+          <FiCalendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <TextInput type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="pl-10" />
+        </div>
+      </motion.div>
+
+      {/* Stats Grid */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
+      >
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <FaUsers className="text-2xl text-green-600" />
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <FiDollarSign className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Total Amount</p>
+              <p className="text-2xl font-bold text-gray-900">৳{stats.totalAmount.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-emerald-100 rounded-lg">
+              <FiUsers className="w-6 h-6 text-emerald-600" />
             </div>
             <div>
               <p className="text-sm text-gray-600">Unique Customers</p>
-              <p className="text-2xl font-bold text-gray-800">{summary.uniqueCustomers.size}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.uniqueCustomers.size}</p>
             </div>
           </div>
-        </Card>
+        </div>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-none">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-purple-100 rounded-lg">
-              <FaShoppingCart className="text-2xl text-purple-600" />
+              <FiShoppingCart className="w-6 h-6 text-purple-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Total Transactions</p>
-              <p className="text-2xl font-bold text-gray-800">{summary.transactionCount}</p>
+              <p className="text-sm text-gray-600">Transactions</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.transactionCount}</p>
             </div>
           </div>
-        </Card>
+        </div>
 
-        <Card className="bg-gradient-to-br from-orange-50 to-red-50 border-none">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <FaChartLine className="text-2xl text-orange-600" />
+            <div className="p-3 bg-amber-100 rounded-lg">
+              <FiPercent className="w-6 h-6 text-amber-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Average Sale</p>
-              <p className="text-2xl font-bold text-gray-800">
-                ৳{summary.averageTransaction.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-              </p>
+              <p className="text-sm text-gray-600">Average Transaction</p>
+              <p className="text-2xl font-bold text-gray-900">৳{stats.averageTransaction.toLocaleString()}</p>
             </div>
           </div>
-        </Card>
-      </div>
+        </div>
+      </motion.div>
 
-      {/* Filters Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white p-4 rounded-lg shadow-sm">
-        <div className="relative">
-          <TextInput
-            type="text"
-            placeholder="Search by customer, amount..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            icon={FaSearch}
-            className="w-full"
-          />
+      {/* Transactions Table */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+      >
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-900">Transaction History</h2>
         </div>
-        <div className="relative">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-            <FaCalendarAlt size={14} />
-          </div>
-          <TextInput
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="w-full pl-10"
-          />
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50">
+                <th
+                  className="px-6 py-4 text-left text-sm font-semibold text-gray-600 cursor-pointer"
+                  onClick={() => handleSort("createdAt")}
+                >
+                  <div className="flex items-center gap-2">
+                    Date
+                    {sortConfig.key === "createdAt" &&
+                      (sortConfig.direction === "asc" ? <FiArrowUp /> : <FiArrowDown />)}
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Customer</th>
+                <th
+                  className="px-6 py-4 text-left text-sm font-semibold text-gray-600 cursor-pointer"
+                  onClick={() => handleSort("finalAmount")}
+                >
+                  <div className="flex items-center gap-2">
+                    Amount
+                    {sortConfig.key === "finalAmount" &&
+                      (sortConfig.direction === "asc" ? <FiArrowUp /> : <FiArrowDown />)}
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              <AnimatePresence>
+                {loading
+                  ? [...Array(5)].map((_, index) => (
+                      <motion.tr
+                        key={`skeleton-${index}`}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="animate-pulse"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="h-4 w-24 bg-gray-200 rounded"></div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="h-4 w-32 bg-gray-200 rounded"></div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="h-4 w-20 bg-gray-200 rounded"></div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="h-4 w-16 bg-gray-200 rounded"></div>
+                        </td>
+                      </motion.tr>
+                    ))
+                  : filteredTransactions.map((transaction) => (
+                      <motion.tr
+                        key={transaction._id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="hover:bg-gray-50/50 transition-colors"
+                      >
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {new Date(transaction.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          {transaction.customerName || "Walk-in"}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          ৳{safeNumber(transaction.finalAmount).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700">
+                            <FiCheckCircle className="w-3 h-3" />
+                            Paid
+                          </span>
+                        </td>
+                      </motion.tr>
+                    ))}
+              </AnimatePresence>
+            </tbody>
+          </table>
         </div>
-        <div className="relative">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-            <FaCalendarAlt size={14} />
-          </div>
-          <TextInput
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="w-full pl-10"
-          />
-        </div>
-      </div>
+      </motion.div>
 
-      {/* Table Section */}
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center h-64 gap-4">
-          <Spinner size="xl" />
-          <p className="text-gray-500">Loading transactions...</p>
-        </div>
-      ) : (
-        <div className="relative overflow-x-auto shadow-md sm:rounded-lg border border-gray-200">
-          <Table hoverable id="printableTable" className="w-full text-sm text-left text-gray-900">
-            <Table.Head>
-              <Table.HeadCell className="bg-gray-50 cursor-pointer font-medium" onClick={() => handleSort("createdAt")}>
-                <div className="flex items-center gap-2">
-                  <FaCalendarAlt size={14} className="text-gray-500" />
-                  <span>Date</span>
-                  {sortConfig.key === "createdAt" && (
-                    <span className="text-gray-500">
-                      {sortConfig.direction === "asc" ? <FaArrowUp size={12} /> : <FaArrowDown size={12} />}
-                    </span>
-                  )}
-                </div>
-              </Table.HeadCell>
-              <Table.HeadCell className="bg-gray-50 font-medium">
-                <div className="flex items-center gap-2">
-                  <FaUsers size={14} className="text-gray-500" />
-                  <span>Customer</span>
-                </div>
-              </Table.HeadCell>
-              <Table.HeadCell
-                className="bg-gray-50 cursor-pointer font-medium"
-                onClick={() => handleSort("finalAmount")}
+      {/* Toast Notifications */}
+      {toast.show && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <Toast>
+            <div className="flex items-center gap-3">
+              <div
+                className={`
+                p-2 rounded-lg
+                ${toast.type === "error" ? "bg-red-100 text-red-600" : ""}
+                ${toast.type === "success" ? "bg-green-100 text-green-600" : ""}
+                ${toast.type === "warning" ? "bg-yellow-100 text-yellow-600" : ""}
+              `}
               >
-                <div className="flex items-center gap-2">
-                  <FaDollarSign size={14} className="text-gray-500" />
-                  <span>Amount</span>
-                  {sortConfig.key === "finalAmount" && (
-                    <span className="text-gray-500">
-                      {sortConfig.direction === "asc" ? <FaArrowUp size={12} /> : <FaArrowDown size={12} />}
-                    </span>
-                  )}
-                </div>
-              </Table.HeadCell>
-              <Table.HeadCell className="bg-gray-50 font-medium">
-                <div className="flex items-center gap-2">
-                  <FaCheckCircle size={14} className="text-gray-500" />
-                  <span>Status</span>
-                </div>
-              </Table.HeadCell>
-            </Table.Head>
-            <Table.Body className="divide-y">
-              {sortedTransactions.map((transaction, index) => (
-                <Table.Row key={index} className="bg-white hover:bg-gray-50 transition-colors">
-                  <Table.Cell className="text-sm text-gray-600">
-                    {new Date(transaction.createdAt).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </Table.Cell>
-                  <Table.Cell>
-                    <span className="font-medium text-gray-900">{transaction.customerName}</span>
-                  </Table.Cell>
-                  <Table.Cell className="font-medium">
-                    ৳{transaction.finalAmount?.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-                  </Table.Cell>
-                  <Table.Cell>
-                    <span className="px-3 py-1.5 rounded-full text-xs font-medium inline-block bg-green-50 text-green-700 border border-green-200">
-                      Paid
-                    </span>
-                  </Table.Cell>
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </Table>
+                <FiAlertCircle className="w-5 h-5" />
+              </div>
+              <div className="text-sm font-medium text-gray-900">{toast.message}</div>
+              <button
+                onClick={() => setToast({ show: false, message: "", type: "" })}
+                className="ml-auto text-gray-400 hover:text-gray-500"
+              >
+                <HiX className="w-5 h-5" />
+              </button>
+            </div>
+          </Toast>
         </div>
       )}
     </div>

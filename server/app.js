@@ -28,6 +28,7 @@ import stockRoutes from './routes/stock.routes.js';
 import saleProfitRoutes from './routes/sale-profit.routes.js';
 import productCategoryRoutes from './routes/productcategory.routes.js';
 import summaryRoutes from './routes/summary.routes.js';
+import handCashRoutes from './routes/handcash.routes.js';
 
 app.use('/api/users', usersRoutes);
 app.use('/api/productlist', productlistRoutes);
@@ -43,7 +44,7 @@ app.use('/api/return-items', returnItemRoutes);
 app.use('/api/payments', paySupplierRoutes);
 app.use('/api/lowstock', productRoutes);
 app.use('/api/stock-value', stockRoutes);
-
+app.use('/api/handcash', handCashRoutes); 
 
 
 // For selling products

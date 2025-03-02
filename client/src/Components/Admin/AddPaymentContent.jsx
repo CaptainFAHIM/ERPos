@@ -131,6 +131,7 @@ export default function AddPaymentContent() {
           unitPrice: item.unitPrice,
           sellPrice: item.sellPrice,
           totalPrice: item.totalPrice,
+          description: item.productDetails.description, // Add the description field
         })),
         totalAmount: totals.totalAmount,
         paidAmount: totals.paidAmount,

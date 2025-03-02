@@ -7,7 +7,8 @@ const PaySupplierSchema = new mongoose.Schema({
             product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
             quantity: { type: Number, required: true },
             unitPrice: { type: Number, required: true },
-            totalPrice: { type: Number, required: true }
+            totalPrice: { type: Number, required: true },
+            description: { type: String } // Added description field
         }
     ],
     totalAmount: { type: Number, required: true },

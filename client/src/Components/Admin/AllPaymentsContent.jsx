@@ -468,7 +468,14 @@ export default function AllPaymentsContent() {
                                       <div className="bg-gray-100 p-3 rounded-lg">
                                         <FiBox className="w-6 h-6 text-gray-500" />
                                       </div>
+                                      
                                       <div className="flex-1 min-w-0">
+                                      {product.description && (
+                                            <div className="col-span-2 space-y-1 mt-2">
+                                              <p className="text-xs text-gray-500">Description</p>
+                                              <p className="text-sm text-gray-700">{product.description}</p>
+                                            </div>
+                                          )}
                                         <h4 className="font-medium text-gray-900 truncate">{product.product?.name}</h4>
                                         <div className="mt-1 grid grid-cols-2 gap-2">
                                           <div className="space-y-1">
@@ -495,6 +502,7 @@ export default function AllPaymentsContent() {
                                               Tk {(product.quantity * product.unitPrice)?.toFixed(2)}
                                             </p>
                                           </div>
+
                                         </div>
                                       </div>
                                     </div>

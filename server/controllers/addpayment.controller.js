@@ -2,11 +2,14 @@ import PaySupplier from "../models/addpayment.model.js";
 import Supplier from "../models/Supplier.model.js";
 import Product from "../models/productlist.model.js";
 import Expense from "../models/expense.model.js";
+import HandCash from '../models/handcash.model..js';
+
 
 export const createPayment = async (req, res) => {
     try {
         const { supplier, products, paidAmount, totalAmount, paymentMethod, invoiceNumber, notes } = req.body;
 
+        // Fetch supplier data
         const supplierData = await Supplier.findById(supplier);
         if (!supplierData) {
             return res.status(404).json({ message: "Supplier not found" });
@@ -15,9 +18,18 @@ export const createPayment = async (req, res) => {
         let dueAmount = totalAmount - paidAmount;
         let paymentStatus = dueAmount <= 0 ? "Paid" : "Pending";
 
+        // Format products with description
+        const formattedProducts = products.map(item => ({
+            product: item.product,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+            description: item.description // Include description
+        }));
+
         const payment = new PaySupplier({
             supplier,
-            products,
+            products: formattedProducts, // Store formatted products
             totalAmount,
             paidAmount,
             dueAmount,
@@ -29,38 +41,61 @@ export const createPayment = async (req, res) => {
 
         await payment.save();
 
-        // Update product quantities in the `totalQuantity` field
+        // Update product quantities
         for (const item of products) {
             const product = await Product.findById(item.product);
             if (product) {
                 product.purchasePrice = item.unitPrice;
                 product.sellPrice = item.sellPrice;
-                product.totalQuantity += item.quantity;  // Update totalQuantity instead of quantity
+                product.totalQuantity += item.quantity;
                 await product.save();
             }
         }
 
-        // Record the expense if fully paid (no due amount)
-        if (dueAmount <= 0) {
-            const expense = new Expense({
-                expenseDate: new Date(),
-                expenseCategory: "Supplier Payment",
-                expenseAmount: totalAmount,
-                expenseNote: `Payment for Invoice #${invoiceNumber}`
-            });
-            await expense.save();
+        // Deduct from hand cash and record as a withdrawal
+        const today = new Date().toISOString().split('T')[0];
+        let handCash = await HandCash.findOne({ date: today });
+
+        if (!handCash) {
+            return res.status(400).json({ message: "No hand cash record found for today" });
         }
 
+        if (handCash.closingBalance < paidAmount) {
+            return res.status(400).json({ message: "Insufficient hand cash balance" });
+        }
+
+        // Deduct the payment amount
+        handCash.closingBalance -= paidAmount;
+
+        // Record the withdrawal with a note
+        handCash.withdrawals.push({
+            amount: paidAmount,
+            reason: `Payment to Supplier: Invoice #${invoiceNumber}`,
+            date: new Date()
+        });
+
+        handCash.withdrawalCount += 1;
+        await handCash.save();
+
         // Update supplier due amount
-        supplierData.dueAmount -= dueAmount;
+        supplierData.dueAmount -= paidAmount;
         if (supplierData.dueAmount < 0) supplierData.dueAmount = 0;
         await supplierData.save();
 
-        res.status(201).json(payment);
+        res.status(201).json({
+            message: "Payment successful",
+            payment,
+            updatedHandCash: handCash.closingBalance,
+            withdrawalRecorded: true
+        });
+
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
 };
+
+
+
 
 
 export const getPayments = async (req, res) => {
@@ -91,7 +126,7 @@ export const updatePayment = async (req, res) => {
         const oldPayment = await PaySupplier.findById(req.params.id);
         if (!oldPayment) return res.status(404).json({ message: "Payment not found" });
 
-        // Decrease the product quantities in the inventory based on the old payment
+        // Reverse old product quantities
         for (const oldItem of oldPayment.products) {
             const product = await Product.findById(oldItem.product);
             if (product) {
@@ -101,21 +136,24 @@ export const updatePayment = async (req, res) => {
             }
         }
 
-        // Get updated fields (only for the payment, not products)
-        const { paidAmount, totalAmount, products } = req.body;
-        let dueAmount = totalAmount - paidAmount;
-        let paymentStatus = dueAmount <= 0 ? "Paid" : "Pending";
+        // Get new payment details
+        const { paidAmount, totalAmount } = req.body;
+        let newDueAmount = totalAmount - paidAmount;
+        let paymentStatus = newDueAmount <= 0 ? "Paid" : "Pending";
 
-        // Update the payment details (no product changes)
+        // Calculate the amount newly paid towards due
+        const newlyPaidAmount = paidAmount - oldPayment.paidAmount;
+
+        // Update the payment record
         const updatedPayment = await PaySupplier.findByIdAndUpdate(
             req.params.id,
-            { paidAmount, totalAmount, dueAmount, status: paymentStatus },
+            { paidAmount, totalAmount, dueAmount: newDueAmount, status: paymentStatus },
             { new: true }
         );
 
         if (!updatedPayment) return res.status(404).json({ message: "Error updating payment" });
 
-        // Recalculate the supplier's due amount after the payment update
+        // Update supplier's due amount
         const supplier = await Supplier.findById(updatedPayment.supplier);
         if (supplier) {
             supplier.dueAmount += oldPayment.dueAmount - updatedPayment.dueAmount;
@@ -123,26 +161,49 @@ export const updatePayment = async (req, res) => {
             await supplier.save();
         }
 
-        // If the payment is fully paid (dueAmount is 0), add the total amount to the expense
-        if (updatedPayment.dueAmount <= 0) {
+        // If newly paid amount reduces due, deduct from hand cash & record withdrawal
+        if (newlyPaidAmount > 0) {
+            const today = new Date().toISOString().split('T')[0];
+            let handCash = await HandCash.findOne({ date: today });
+
+            if (!handCash) {
+                return res.status(400).json({ message: "No hand cash record found for today" });
+            }
+
+            if (handCash.closingBalance < newlyPaidAmount) {
+                return res.status(400).json({ message: "Insufficient hand cash balance" });
+            }
+
+            // Deduct the newly paid amount from hand cash and record withdrawal
+            handCash.closingBalance -= newlyPaidAmount;
+            handCash.withdrawals.push({
+                amount: newlyPaidAmount,
+                reason: `Supplier due Payment (Invoice #${updatedPayment.invoiceNumber})`,
+                date: new Date()
+            });
+            handCash.withdrawalCount += 1;
+            await handCash.save();
+
+            // Add to expenses
             const expense = new Expense({
                 expenseDate: new Date(),
                 expenseCategory: "Supplier Payment",
-                expenseAmount: updatedPayment.totalAmount,
+                expenseAmount: newlyPaidAmount,
                 expenseNote: `Payment for Invoice #${updatedPayment.invoiceNumber}`
             });
             await expense.save();
         }
 
-        // Return the updated payment information with the due amount
         res.status(200).json({
             ...updatedPayment.toObject(),
-            dueAmount
+            dueAmount: newDueAmount
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };
+
+
 
 
 

@@ -1,10 +1,10 @@
 import React from 'react'
-import ProfitWithdrawal from './Profit-withdrawal'
+import HandCashManagement from './HandCashManagement'
 
 function Owner() {
   return (
     <div>
-      <ProfitWithdrawal/>
+      <HandCashManagement/>
     </div>
   )
 }

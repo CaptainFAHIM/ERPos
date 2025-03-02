@@ -1,5 +1,5 @@
 import express from 'express';
-import { addUser, loginUser, getUsers, getUserById, updateUser, deleteUser } from '../controllers/users.controller.js';
+import { addUser, loginUser, getUsers, getUserById, updateUser, deleteUser, changePassword } from '../controllers/users.controller.js';
 
 const router = express.Router();
 
@@ -9,5 +9,7 @@ router.get('/', getUsers); // Get all users
 router.get('/:id', getUserById); // Get user by ID
 router.put('/:id', updateUser); // Update user
 router.delete('/:id', deleteUser); // Delete user by ID
+router.put('/change-password', changePassword);
+
 
 export default router;

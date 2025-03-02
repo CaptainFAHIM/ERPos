@@ -19,6 +19,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion"
 import SummaryCards from "./summary-cards"
 import FinancialSummary from "./financial-summary"
+import ReportDashboard from "./ReportDashboard"
 
 // Enhanced loading spinner component
 const LoadingSpinner = ({ color = "blue" }) => (
@@ -195,8 +196,12 @@ export default function PremiumDashboard() {
 
        <div className="mb-10">
        <SummaryCards/> 
-
        </div>
+
+       <div className="mb-10">
+       <ReportDashboard/>
+       </div>
+     
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Sales & Profit Chart */}
           <motion.div

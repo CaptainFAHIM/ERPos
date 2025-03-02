@@ -1,11 +1,18 @@
 import express from 'express';
-import { updateHandCash, getHandCashByDate, getAllHandCash } from '../controllers/handcash.controller.js';
+import { getTodayHandCash, withdrawHandCash, getWithdrawalHistory, getTotalHandCash } from '../controllers/handcash.controller.js';
 
 const router = express.Router();
 
+// Get today's hand cash and withdrawals
+router.get('/today', getTodayHandCash);
 
-router.post('/update', updateHandCash); // Update or insert hand cash
-router.get('/:date', getHandCashByDate); // Get hand cash for a specific date
-router.get('/', getAllHandCash); // Get all hand cash records
+// Withdraw hand cash
+router.post('/withdraw', withdrawHandCash);
+
+// Get total withdrawal history
+router.get('/withdrawals', getWithdrawalHistory);
+
+// Get total hand cash (sum of all closing balances)
+router.get('/total', getTotalHandCash);
 
 export default router;

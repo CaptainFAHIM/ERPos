@@ -147,3 +147,29 @@ export const toggleUserStatus = async (req, res) => {
         res.status(500).json({ message: "Error updating user status", error: error.message });
     }
 };
+
+// Change user password
+export const changePassword = async (req, res) => {
+    try {
+        const { userId, oldPassword, newPassword } = req.body;
+
+        // Validate user
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Check if old password matches
+        if (user.password !== oldPassword) {
+            return res.status(401).json({ message: "Old password is incorrect" });
+        }
+
+        // Update password
+        user.password = newPassword;
+        await user.save();
+
+        res.status(200).json({ message: "Password updated successfully" });
+    } catch (error) {
+        res.status(500).json({ message: "Error changing password", error: error.message });
+    }
+};

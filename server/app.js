@@ -28,7 +28,8 @@ import stockRoutes from './routes/stock.routes.js';
 import saleProfitRoutes from './routes/sale-profit.routes.js';
 import productCategoryRoutes from './routes/productcategory.routes.js';
 import summaryRoutes from './routes/summary.routes.js';
-import handCashRoutes from './routes/handcash.routes.js';
+import  reportRotues from "./routes/report.routes.js"
+import  handcashRotues from "./routes/handcash.routes.js"
 
 app.use('/api/users', usersRoutes);
 app.use('/api/productlist', productlistRoutes);
@@ -44,7 +45,6 @@ app.use('/api/return-items', returnItemRoutes);
 app.use('/api/payments', paySupplierRoutes);
 app.use('/api/lowstock', productRoutes);
 app.use('/api/stock-value', stockRoutes);
-app.use('/api/handcash', handCashRoutes); 
 
 
 // For selling products
@@ -61,6 +61,10 @@ app.use("/api/sales", salesRoutes)
 
 //for calculatoin the numbers of category 
  app.use('/api/productscategory', productCategoryRoutes);
+
+//for cash balance
+ app.use('/api/report', reportRotues);
+ app.use('/api/handcash', handcashRotues);
 
 //handle error
 app.use((err,req,res,next)=>{

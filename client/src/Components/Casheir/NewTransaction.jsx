@@ -22,6 +22,7 @@ const NewTransaction = () => {
     settlePayment,
     products,
     transactionNo,
+    setTransactionNo,
   } = usePOSContext()
 
   const [showPurchasePrice, setShowPurchasePrice] = useState({})
@@ -36,7 +37,25 @@ const NewTransaction = () => {
       alert("Cart is empty. Please add items before settling payment.")
       return
     }
+
     settlePayment()
+
+    // Clear all inputs after successful payment
+    setCustomerName("")
+    setCustomerNumber("")
+    setPaymentMethod("cash")
+    updateDiscount(0)
+    setShowPurchasePrice({})
+
+    // Generate new transaction number
+    const timestamp = Date.now()
+    const random = Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, "0")
+    const newTransactionNo = `TXN${timestamp}${random}`
+
+    // Update transaction number in context
+    setTransactionNo(newTransactionNo)
   }
 
   const togglePurchasePrice = (productId) => {
